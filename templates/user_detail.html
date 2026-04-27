@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+{% block title %}Пользователь {{ user.username }}{% endblock %}
+{% block page_title %}Профиль пользователя{% endblock %}
+
+{% block content %}
+<div class="back-link">
+    <a href="{{ url_for('users') }}"><i class="fas fa-arrow-left"></i> Назад к списку</a>
+</div>
+
+<!-- Профиль -->
+<div class="card user-profile-card">
+    <div class="card-body">
+        <div class="user-profile-header">
+            <div class="user-avatar"><i class="fas fa-user-circle"></i></div>
+            <div class="user-profile-info">
+                <h2>
+                    {{ user.first_name }} {{ user.last_name or '' }}
+                    {% if user.verified %}<i class="fas fa-check-circle verified-icon" title="Верифицирован"></i>{% endif %}
+                </h2>
+                <p class="username">@{{ user.username or 'Без username' }}</p>
+                <p class="user-id">ID: <a href="tg://user?id={{ user.user_id }}" class="link">{{ user.user_id }}</a></p>
+                <div class="user-badges">
+                    {% if user.premium_status %}<span class="badge badge-premium">Premium</span>{% endif %}
+                    {% if user.verified %}<span class="badge badge-verified">Verified</span>{% endif %}
+                    {% if user.is_blocked %}<span class="badge badge-danger">Заблокирован</span>{% endif %}
+                </div>
+            </div>
+            <div class="user-actions">
+                {% if user.is_blocked %}
+                <button onclick="unblockUser({{ user.user_id }})" class="btn btn-success"><i class="fas fa-unlock"></i> Разблокировать</button>
+                <p class="block-reason">Причина: {{ user.block_reason }}</p>
+                {% else %}
+                <button onclick="blockUser({{ user.user_id }})" class="btn btn-danger"><i class="fas fa-ban"></i> Заблокировать</button>
+                {% endif %}
+                {% if user.premium_status %}
+                <button onclick="togglePremium({{ user.user_id }}, 'revoke')" class="btn btn-warning"><i class="fas fa-crown"></i> Снять Premium</button>
+                {% else %}
+                <button onclick="togglePremium({{ user.user_id }}, 'grant')" class="btn btn-secondary"><i class="fas fa-crown"></i> Выдать Premium</button>
+                {% endif %}
+                <button onclick="openSendMessage({{ user.user_id }})" class="btn btn-info"><i class="fas fa-paper-plane"></i> Написать</button>
+            </div>
+        </div>
+
+        <div class="user-stats-grid">
+            <div class="stat-item"><i class="fas fa-handshake"></i><div><strong>{{ user.total_deals }}</strong><span>Всего сделок</span></div></div>
+            <div class="stat-item"><i class="fas fa-check-circle"></i><div><strong>{{ user.successful_deals }}</strong><span>Успешных</span></div></div>
+            <div class="stat-item"><i class="fas fa-times-circle"></i><div><strong>{{ user.cancelled_deals }}</strong><span>Отменённых</span></div></div>
+            <div class="stat-item"><i class="fas fa-star"></i><div><strong>{{ "%.1f"|format(user.rating) }}</strong><span>Рейтинг</span></div></div>
+            <div class="stat-item"><i class="fas fa-ruble-sign"></i><div><strong>{{ "{:,.0f}".format(user.total_volume) }}₽</strong><span>Оборот</span></div></div>
+            <div class="stat-item"><i class="fas fa-users"></i><div><strong>{{ user.referrals_count }}</strong><span>Рефералов</span></div></div>
+            <div class="stat-item"><i class="fas fa-calendar"></i><div><strong>{{ user.registration_date[:10] }}</strong><span>Регистрация</span></div></div>
+            <div class="stat-item"><i class="fas fa-clock"></i><div><strong>{{ user.last_activity[:10] }}</strong><span>Активность</span></div></div>
+        </div>
+    </div>
+</div>
+
+<!-- Балансы + управление -->
+<div class="card">
+    <div class="card-header">
+        <h3><i class="fas fa-wallet"></i> Балансы</h3>
+        <button onclick="openBalanceModal()" class="btn btn-sm btn-primary"><i class="fas fa-edit"></i> Изменить</button>
+    </div>
+    <div class="card-body">
+        <div class="balance-grid">
+            <div class="balance-item"><i class="fas fa-ruble-sign"></i><div><strong id="bal_rub">{{ "{:,.2f}".format(user.balance_rub) }}₽</strong><span>Рубли</span></div></div>
+            <div class="balance-item"><i class="fas fa-dollar-sign"></i><div><strong id="bal_usd">${{ "{:,.2f}".format(user.balance_usd) }}</strong><span>Доллары</span></div></div>
+            <div class="balance-item"><i class="fas fa-coins"></i><div><strong id="bal_ton">{{ "{:,.2f}".format(user.balance_ton) }} TON</strong><span>TON</span></div></div>
+            <div class="balance-item"><i class="fas fa-star"></i><div><strong id="bal_stars">{{ user.balance_stars }}</strong><span>Stars</span></div></div>
+        </div>
+    </div>
+</div>
+
+<!-- Вкладки -->
+<div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('deals', this)"><i class="fas fa-handshake"></i> Сделки ({{ deals|length }})</button>
+    <button class="tab-btn" onclick="switchTab('transactions', this)"><i class="fas fa-exchange-alt"></i> Транзакции ({{ transactions|length }})</button>
+    <button class="tab-btn" onclick="switchTab('reviews', this)"><i class="fas fa-star"></i> Отзывы ({{ reviews|length }})</button>
+    <button class="tab-btn" onclick="switchTab('appeals', this)"><i class="fas fa-envelope"></i> Обращения ({{ appeals|length }})</button>
+    <button class="tab-btn" onclick="switchTab('logs', this)"><i class="fas fa-list-alt"></i> Логи ({{ logs|length }})</button>
+</div>
+
+<div id="deals-tab" class="tab-content active">
+    <div class="card"><div class="card-header"><h3>Сделки пользователя</h3></div>
+    <div class="card-body"><div class="table-responsive"><table class="table">
+        <thead><tr><th>ID</th><th>Роль</th><th>Товар</th><th>Сумма</th><th>Статус</th><th>Дата</th><th></th></tr></thead>
+        <tbody>
+        {% for deal in deals %}
+        <tr>
+            <td><a href="{{ url_for('deal_detail', deal_id=deal.deal_id) }}" class="link">{{ deal.deal_id[:12] }}...</a></td>
+            <td>{% if deal.seller_id == user.user_id %}<span class="badge badge-info">Продавец</span>{% else %}<span class="badge badge-warning">Покупатель</span>{% endif %}</td>
+            <td>{{ deal.product_type }}</td>
+            <td><strong>{{ deal.amount }} {{ deal.currency }}</strong></td>
+            <td><span class="badge badge-{{ deal.status }}">{{ deal.status }}</span></td>
+            <td>{{ deal.created_at[:16] }}</td>
+            <td><a href="{{ url_for('deal_detail', deal_id=deal.deal_id) }}" class="btn btn-sm btn-info"><i class="fas fa-eye"></i></a></td>
+        </tr>
+        {% else %}<tr><td colspan="7" style="text-align:center;color:var(--text-light)">Нет сделок</td></tr>{% endfor %}
+        </tbody>
+    </table></div></div></div>
+</div>
+
+<div id="transactions-tab" class="tab-content">
+    <div class="card"><div class="card-header"><h3>Транзакции</h3></div>
+    <div class="card-body"><div class="table-responsive"><table class="table">
+        <thead><tr><th>ID</th><th>Тип</th><th>Сумма</th><th>Статус</th><th>Описание</th><th>Дата</th></tr></thead>
+        <tbody>
+        {% for tx in transactions %}
+        <tr>
+            <td>{{ tx.transaction_id }}</td>
+            <td><span class="badge badge-info">{{ tx.type }}</span></td>
+            <td><strong>{{ tx.amount }} {{ tx.currency }}</strong></td>
+            <td><span class="badge badge-{{ tx.status }}">{{ tx.status }}</span></td>
+            <td style="font-size:13px;color:var(--text-light)">{{ tx.description }}</td>
+            <td>{{ tx.created_at[:16] }}</td>
+        </tr>
+        {% else %}<tr><td colspan="6" style="text-align:center;color:var(--text-light)">Нет транзакций</td></tr>{% endfor %}
+        </tbody>
+    </table></div></div></div>
+</div>
+
+<div id="reviews-tab" class="tab-content">
+    <div class="card"><div class="card-header"><h3>Отзывы</h3></div>
+    <div class="card-body">
+        {% for review in reviews %}
+        <div class="review-item">
+            <div class="review-header">
+                <strong>@{{ review.from_username }}</strong>
+                <div class="review-rating">{% for i in range(review.rating) %}<i class="fas fa-star"></i>{% endfor %}</div>
+                <span class="review-date">{{ review.created_at[:16] }}</span>
+            </div>
+            <p class="review-comment">{{ review.comment }}</p>
+        </div>
+        {% else %}<p style="color:var(--text-light)">Нет отзывов</p>{% endfor %}
+    </div></div>
+</div>
+
+<div id="appeals-tab" class="tab-content">
+    <div class="card"><div class="card-header"><h3>Обращения</h3></div>
+    <div class="card-body">
+        {% for appeal in appeals %}
+        <div class="appeal-item">
+            <div class="appeal-header">
+                <span class="badge badge-{{ appeal.type }}">{{ appeal.type }}</span>
+                <strong>{{ appeal.subject }}</strong>
+                <span class="badge badge-{{ appeal.status }}">{{ appeal.status }}</span>
+            </div>
+            <p>{{ appeal.message }}</p>
+            {% if appeal.admin_response %}<p style="color:var(--info);font-size:13px"><i class="fas fa-reply"></i> {{ appeal.admin_response }}</p>{% endif %}
+            <small style="color:var(--text-light)">{{ appeal.created_at[:16] }}</small>
+        </div>
+        {% else %}<p style="color:var(--text-light)">Нет обращений</p>{% endfor %}
+    </div></div>
+</div>
+
+<div id="logs-tab" class="tab-content">
+    <div class="card"><div class="card-header"><h3>Последние действия</h3></div>
+    <div class="card-body"><div class="table-responsive"><table class="table">
+        <thead><tr><th>Действие</th><th>Детали</th><th>Время</th></tr></thead>
+        <tbody>
+        {% for log in logs %}
+        <tr>
+            <td><code style="font-size:12px;background:var(--light);padding:3px 7px;border-radius:5px">{{ log.action }}</code></td>
+            <td style="font-size:13px;color:var(--text-light)">{{ log.details or '—' }}</td>
+            <td style="font-size:13px">{{ log.created_at[:16] }}</td>
+        </tr>
+        {% else %}<tr><td colspan="3" style="text-align:center;color:var(--text-light)">Нет логов</td></tr>{% endfor %}
+        </tbody>
+    </table></div></div></div>
+</div>
+
+<!-- Модалка: изменение баланса -->
+<div id="balanceModal" class="modal-overlay" style="display:none">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3><i class="fas fa-wallet"></i> Изменить баланс</h3>
+            <button onclick="closeModal('balanceModal')" class="modal-close"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>Валюта</label>
+                <select id="bal_currency" class="form-control">
+                    <option value="rub">RUB (Рубли)</option>
+                    <option value="usd">USD (Доллары)</option>
+                    <option value="ton">TON</option>
+                    <option value="stars">Stars</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Операция</label>
+                <select id="bal_operation" class="form-control">
+                    <option value="add">Пополнить (+)</option>
+                    <option value="subtract">Списать (−)</option>
+                    <option value="set">Установить (=)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Сумма</label>
+                <input type="number" id="bal_amount" class="form-control" placeholder="0.00" min="0" step="0.01">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button onclick="submitBalance()" class="btn btn-primary"><i class="fas fa-check"></i> Применить</button>
+            <button onclick="closeModal('balanceModal')" class="btn btn-secondary">Отмена</button>
+        </div>
+    </div>
+</div>
+
+<!-- Модалка: отправить сообщение -->
+<div id="sendMsgModal" class="modal-overlay" style="display:none">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3><i class="fas fa-paper-plane"></i> Написать пользователю</h3>
+            <button onclick="closeModal('sendMsgModal')" class="modal-close"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>Сообщение</label>
+                <textarea id="msgText" rows="5" class="form-control" placeholder="Текст сообщения..."></textarea>
+            </div>
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="msgBanner" checked>
+                    <span><i class="fas fa-image"></i> Отправить с баннером</span>
+                </label>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button onclick="submitMessage()" class="btn btn-primary"><i class="fas fa-paper-plane"></i> Отправить</button>
+            <button onclick="closeModal('sendMsgModal')" class="btn btn-secondary">Отмена</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const USER_ID = {{ user.user_id }};
+
+function switchTab(name, btn) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(name + '-tab').classList.add('active');
+    btn.classList.add('active');
+}
+
+function blockUser(userId) {
+    const reason = prompt('Причина блокировки:');
+    if (!reason) return;
+    fetch(`/api/user/${userId}/block`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason})})
+    .then(r=>r.json()).then(d=>{ if(d.success) location.reload(); else alert(d.message); });
+}
+function unblockUser(userId) {
+    if (!confirm('Разблокировать?')) return;
+    fetch(`/api/user/${userId}/unblock`, {method:'POST',headers:{'Content-Type':'application/json'}})
+    .then(r=>r.json()).then(d=>{ if(d.success) location.reload(); else alert(d.message); });
+}
+function togglePremium(userId, action) {
+    if (!confirm(action==='grant'?'Выдать Premium?':'Снять Premium?')) return;
+    fetch(`/api/user/${userId}/premium`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action})})
+    .then(r=>r.json()).then(d=>{ if(d.success) location.reload(); else alert(d.message); });
+}
+
+function openBalanceModal() { document.getElementById('balanceModal').style.display='flex'; }
+function openSendMessage(uid) { document.getElementById('sendMsgModal').style.display='flex'; }
+function closeModal(id) { document.getElementById(id).style.display='none'; }
+
+function submitBalance() {
+    const currency = document.getElementById('bal_currency').value;
+    const operation = document.getElementById('bal_operation').value;
+    const amount = parseFloat(document.getElementById('bal_amount').value);
+    if (isNaN(amount) || amount < 0) { alert('Введите корректную сумму'); return; }
+    fetch(`/api/user/${USER_ID}/balance`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({currency, operation, amount})
+    }).then(r=>r.json()).then(d=>{
+        if (d.success) { showNotification(d.message,'success'); closeModal('balanceModal'); setTimeout(()=>location.reload(),1000); }
+        else alert(d.message);
+    });
+}
+
+function submitMessage() {
+    const message = document.getElementById('msgText').value.trim();
+    const with_banner = document.getElementById('msgBanner').checked;
+    if (!message) { alert('Введите текст'); return; }
+    fetch('/api/send_message', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({user_id: USER_ID, message, with_banner})
+    }).then(r=>r.json()).then(d=>{
+        if (d.success) { showNotification('Сообщение отправлено!','success'); closeModal('sendMsgModal'); }
+        else alert(d.message);
+    });
+}
+
+// Закрытие модалок по клику вне
+document.querySelectorAll('.modal-overlay').forEach(m => {
+    m.addEventListener('click', e => { if (e.target === m) m.style.display='none'; });
+});
+</script>
+{% endblock %}

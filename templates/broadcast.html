@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block title %}Рассылка{% endblock %}
+{% block page_title %}Рассылка сообщений{% endblock %}
+
+{% block content %}
+<div class="grid-2">
+    <!-- Форма рассылки -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-bullhorn"></i> Новая рассылка</h3>
+        </div>
+        <div class="card-body">
+            <form method="POST" id="broadcastForm">
+                <div class="form-group">
+                    <label>Аудитория</label>
+                    <div class="audience-cards">
+                        <label class="audience-card">
+                            <input type="radio" name="target" value="all" checked>
+                            <div class="audience-info">
+                                <i class="fas fa-users"></i>
+                                <strong>Все пользователи</strong>
+                                <span>{{ total_users }}</span>
+                            </div>
+                        </label>
+                        <label class="audience-card">
+                            <input type="radio" name="target" value="premium">
+                            <div class="audience-info">
+                                <i class="fas fa-crown"></i>
+                                <strong>Premium</strong>
+                                <span>{{ premium_users }}</span>
+                            </div>
+                        </label>
+                        <label class="audience-card">
+                            <input type="radio" name="target" value="verified">
+                            <div class="audience-info">
+                                <i class="fas fa-certificate"></i>
+                                <strong>Верифицированные</strong>
+                                <span>{{ verified_users }}</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="message">Текст сообщения</label>
+                    <textarea id="message" name="message" rows="8" class="form-control"
+                              placeholder="Введите текст рассылки...&#10;&#10;Поддерживается обычный текст."></textarea>
+                    <small id="charCount">0 / 1024 символов</small>
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="with_banner" checked>
+                        <span><i class="fas fa-image"></i> Отправить с баннером (banner.jpg)</span>
+                    </label>
+                    {% if not banner_exists %}
+                    <small style="color:var(--warning)">⚠️ Файл banner.jpg не найден — сообщение будет без баннера</small>
+                    {% endif %}
+                </div>
+
+                <div class="form-actions" style="margin-top:20px;padding-top:0;border:none;">
+                    <button type="submit" class="btn btn-primary btn-lg" onclick="return confirmBroadcast()">
+                        <i class="fas fa-paper-plane"></i> Запустить рассылку
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Статистика аудитории -->
+    <div>
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-chart-pie"></i> Аудитория</h3>
+            </div>
+            <div class="card-body">
+                <div class="audience-stats">
+                    <div class="aud-stat">
+                        <i class="fas fa-users" style="color:var(--primary)"></i>
+                        <div>
+                            <strong>{{ total_users }}</strong>
+                            <span>Всего активных</span>
+                        </div>
+                    </div>
+                    <div class="aud-stat">
+                        <i class="fas fa-crown" style="color:#fbbf24"></i>
+                        <div>
+                            <strong>{{ premium_users }}</strong>
+                            <span>Premium</span>
+                        </div>
+                    </div>
+                    <div class="aud-stat">
+                        <i class="fas fa-certificate" style="color:var(--success)"></i>
+                        <div>
+                            <strong>{{ verified_users }}</strong>
+                            <span>Верифицированных</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-info-circle"></i> Советы</h3>
+            </div>
+            <div class="card-body">
+                <ul style="list-style:none;padding:0;line-height:2">
+                    <li>✅ Рассылка идёт ~20 сообщений/сек</li>
+                    <li>✅ С баннером — отправляется как фото с подписью</li>
+                    <li>✅ Заблокированные пользователи пропускаются</li>
+                    <li>⚠️ Максимум 1024 символа в сообщении</li>
+                    <li>⚠️ Не злоупотребляйте рассылками</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- История рассылок -->
+<div class="card">
+    <div class="card-header">
+        <h3><i class="fas fa-history"></i> История рассылок</h3>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Сообщение</th>
+                        <th>Отправлено</th>
+                        <th>Ошибок</th>
+                        <th>Статус</th>
+                        <th>Дата</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for b in broadcasts %}
+                    <tr>
+                        <td>{{ b.broadcast_id }}</td>
+                        <td><div style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ b.message }}</div></td>
+                        <td><span style="color:var(--success);font-weight:600">{{ b.sent_count }}</span></td>
+                        <td><span style="color:var(--danger);font-weight:600">{{ b.failed_count }}</span></td>
+                        <td><span class="badge badge-{{ 'completed' if b.status == 'completed' else 'pending' }}">{{ b.status }}</span></td>
+                        <td>{{ b.created_at[:16] }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="6" style="text-align:center;color:var(--text-light)">Рассылок ещё не было</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const textarea = document.getElementById('message');
+const counter = document.getElementById('charCount');
+textarea.addEventListener('input', () => {
+    counter.textContent = textarea.value.length + ' / 1024 символов';
+    if (textarea.value.length > 1024) counter.style.color = 'var(--danger)';
+    else counter.style.color = 'var(--text-light)';
+});
+
+function confirmBroadcast() {
+    const target = document.querySelector('input[name="target"]:checked').value;
+    const msg = document.getElementById('message').value.trim();
+    if (!msg) { alert('Введите текст сообщения'); return false; }
+    if (msg.length > 1024) { alert('Сообщение слишком длинное (макс. 1024 символа)'); return false; }
+    const labels = { all: 'всем пользователям', premium: 'Premium пользователям', verified: 'верифицированным' };
+    return confirm(`Отправить рассылку ${labels[target]}?\n\nПервые 100 символов:\n${msg.substring(0,100)}...`);
+}
+
+// Подсветка выбранной аудитории
+document.querySelectorAll('.audience-card input').forEach(radio => {
+    radio.addEventListener('change', () => {
+        document.querySelectorAll('.audience-card').forEach(c => c.classList.remove('selected'));
+        radio.closest('.audience-card').classList.add('selected');
+    });
+});
+document.querySelector('.audience-card input:checked').closest('.audience-card').classList.add('selected');
+</script>
+{% endblock %}

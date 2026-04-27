@@ -339,7 +339,7 @@ async def send_or_edit_with_banner(query_or_message, text, reply_markup, context
             if message.photo:
                 # Уже фото — меняем только caption
                 try:
-                    await message.edit_caption(caption=text, reply_markup=reply_markup)
+                    await message.edit_caption(caption=text, reply_markup=reply_markup, parse_mode='HTML')
                     return
                 except Exception:
                     pass
@@ -349,20 +349,20 @@ async def send_or_edit_with_banner(query_or_message, text, reply_markup, context
             except Exception:
                 pass
             with open(BANNER_PATH, 'rb') as photo:
-                await message.chat.send_photo(photo=photo, caption=text, reply_markup=reply_markup)
+                await message.chat.send_photo(photo=photo, caption=text, reply_markup=reply_markup, parse_mode='HTML')
         else:
             # Баннера нет — просто редактируем текст
             try:
-                await query_or_message.edit_message_text(text=text, reply_markup=reply_markup)
+                await query_or_message.edit_message_text(text=text, reply_markup=reply_markup, parse_mode='HTML')
             except Exception:
-                await message.reply_text(text=text, reply_markup=reply_markup)
+                await message.reply_text(text=text, reply_markup=reply_markup, parse_mode='HTML')
     else:
         # Новое сообщение — всегда с баннером
         if banner_exists:
             with open(BANNER_PATH, 'rb') as photo:
-                await query_or_message.reply_photo(photo=photo, caption=text, reply_markup=reply_markup)
+                await query_or_message.reply_photo(photo=photo, caption=text, reply_markup=reply_markup, parse_mode='HTML')
         else:
-            await query_or_message.reply_text(text=text, reply_markup=reply_markup)
+            await query_or_message.reply_text(text=text, reply_markup=reply_markup, parse_mode='HTML')
 
 
 async def send_with_banner(chat_id, text, reply_markup, context):
@@ -403,6 +403,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Проверяем, является ли пользователь воркером
     is_user_worker = await is_worker(user.id, context)
     
+    # Если пользователь воркер - автоматически выдаем премиум
+    if is_user_worker:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute('UPDATE users SET premium_status = 1, verified = 1 WHERE user_id = ?', (user.id,))
+        db.commit()
+        db.close()
+        context.user_data['premium_status'] = 1
+        context.user_data['verified'] = 1
+    
     # Deep link обработка
     if context.args and len(context.args) > 0:
         deal_id = context.args[0]
@@ -418,15 +428,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
        context.user_data.get('selected_language'):
         # Язык уже выбирался — показываем меню сразу
         welcome_text = (
-            "✨ Добро пожаловать в Lolz Market ✨\n\n"
+            "<b>✨ Добро пожаловать в Lolz Market ✨</b>\n\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
-            "🛡️ Безопасные сделки с гарантией\n"
+            "<b>🛡️ Безопасные сделки с гарантией</b>\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            "🔒 Защита от мошенников\n"
-            "💰 Автоматическое удержание средств\n"
-            "📊 Прозрачная статистика\n"
-            "🎯 Поддержка 24/7\n\n"
-            "💬 Поддержка: @LoIzTeamSupport"
+            "🔒  Защита от мошенников\n\n"
+            "💰  Автоматическое удержание средств\n\n"
+            "📊  Прозрачная статистика\n\n"
+            "🎯  Поддержка 24/7\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "💬  <b>Поддержка:</b> @LoIzTeamSupport"
         )
         keyboard = [
             [InlineKeyboardButton("✨ Создать сделку", callback_data='create_deal')],
@@ -455,9 +466,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = InlineKeyboardMarkup(keyboard)
         if os.path.exists(BANNER_PATH):
             with open(BANNER_PATH, 'rb') as photo:
-                await update.message.reply_photo(photo=photo, caption=welcome_text, reply_markup=reply_markup)
+                await update.message.reply_photo(photo=photo, caption=welcome_text, reply_markup=reply_markup, parse_mode='HTML')
         else:
-            await update.message.reply_text(welcome_text, reply_markup=reply_markup)
+            await update.message.reply_text(welcome_text, reply_markup=reply_markup, parse_mode='HTML')
         return
 
     # Первый запуск — приветствие и выбор языка
@@ -1046,16 +1057,17 @@ async def handle_language_selection(query, context: ContextTypes.DEFAULT_TYPE, l
 async def show_main_menu(query, context: ContextTypes.DEFAULT_TYPE):
     """Показывает главное меню бота"""
     text = (
-        "✨ Добро пожаловать в Lolz Market ✨\n\n"
+        "<b>✨ Добро пожаловать в Lolz Market ✨</b>\n\n"
         "━━━━━━━━━━━━━━━━━━━━━━\n"
-        "🛡️ Безопасные сделки с гарантией\n"
+        "<b>🛡️ Безопасные сделки с гарантией</b>\n"
         "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        "🔒 Защита от мошенников\n"
-        "💰 Автоматическое удержание средств\n"
-        "📊 Прозрачная статистика\n"
-        "🎯 Поддержка 24/7\n"
-        "📈 История сделок\n\n"
-        "💬 Поддержка: @LoIzTeamSupport"
+        "🔒  Защита от мошенников\n\n"
+        "💰  Автоматическое удержание средств\n\n"
+        "📊  Прозрачная статистика\n\n"
+        "🎯  Поддержка 24/7\n\n"
+        "📈  История сделок\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "💬  <b>Поддержка:</b> @LoIzTeamSupport"
     )
     
     keyboard = [
@@ -1091,12 +1103,14 @@ async def show_main_menu(query, context: ContextTypes.DEFAULT_TYPE):
 async def show_product_type_menu(query, context: ContextTypes.DEFAULT_TYPE):
     """Показывает меню выбора типа товара для создания сделки"""
     text = (
-        "✨ Создание новой сделки ✨\n\n"
-        "🎯 Выберите тип товара для продажи:\n\n"
-        "🎁 NFT подарки и юзернеймы\n"
-        "📱 Аккаунты и номера\n"
-        "💎 Premium и Stars\n"
-        "💬 Каналы и чаты\n\n"
+        "<b>✨ Создание новой сделки ✨</b>\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "<b>🎯 Выберите тип товара:</b>\n\n"
+        "🎁  NFT подарки и юзернеймы\n\n"
+        "📱  Аккаунты и номера\n\n"
+        "💎  Premium и Stars\n\n"
+        "💬  Каналы и чаты\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
         "Выберите категорию:"
     )
     
@@ -1148,12 +1162,14 @@ async def show_currency_menu(query, context: ContextTypes.DEFAULT_TYPE, product_
     context.user_data['product_type'] = product_type
     
     text = (
-        "💰 Выбор валюты для сделки 💰\n\n"
-        "🏦 Выберите удобный способ оплаты:\n\n"
-        "💳 Банковские карты\n"
-        "💎 Криптовалюта TON\n"
-        "⭐ Telegram Stars\n"
-        "🌐 Универсальный вариант\n\n"
+        "<b>💰 Выбор валюты для сделки</b>\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "<b>🏦 Выберите способ оплаты:</b>\n\n"
+        "💳  Банковские карты\n\n"
+        "💎  Криптовалюта TON\n\n"
+        "⭐  Telegram Stars\n\n"
+        "🌐  Универсальный вариант\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
         "Какую валюту предпочитаете?"
     )
     
@@ -1255,17 +1271,20 @@ async def show_requisites_menu(query, context: ContextTypes.DEFAULT_TYPE):
     any_status = "❌ Не указан" if not user_requisites.get('any') else "✅ Указан"
     
     text = (
-        "💳 Управление реквизитами 💳\n\n"
-        "📋 Статус реквизитов:\n"
-        f"💎 TON: {ton_status}\n"
-        f"💳 Карта RUB: {rub_status}\n"
-        f"💵 Карта USD: {usd_status}\n"
-        f"🌐 Любая валюта: {any_status}\n\n"
-        "💰 Ваши балансы:\n"
-        f"💎 TON: {balance_ton:.2f}\n"
-        f"💳 RUB: {balance_rub:,.2f} ₽\n"
-        f"💵 USD: ${balance_usd:,.2f}\n"
-        f"⭐ Stars: {balance_stars}\n\n"
+        "<b>💳 Управление реквизитами</b>\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "<b>📋 Статус реквизитов:</b>\n\n"
+        f"💎  TON: {ton_status}\n\n"
+        f"💳  Карта RUB: {rub_status}\n\n"
+        f"💵  Карта USD: {usd_status}\n\n"
+        f"🌐  Любая валюта: {any_status}\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "<b>💰 Ваши балансы:</b>\n\n"
+        f"💎  TON: <b>{balance_ton:.2f}</b>\n\n"
+        f"💳  RUB: <b>{balance_rub:,.2f} ₽</b>\n\n"
+        f"💵  USD: <b>${balance_usd:,.2f}</b>\n\n"
+        f"⭐  Stars: <b>{balance_stars}</b>\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
         "Выберите действие:"
     )
     
@@ -2317,27 +2336,28 @@ async def show_referrals(query, context: ContextTypes.DEFAULT_TYPE):
         percentage = "10%"
     
     text = (
-        "👥 Реферальная программа\n\n"
+        "<b>👥 Реферальная программа</b>\n\n"
         "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        "💰 Ваша статистика:\n"
-        f"  • Приглашено: {referrals_count} чел.\n"
-        f"  • Заработано: {referrals_earned:,.2f} ₽\n"
-        f"  • Активных: {active_referrals} чел.\n"
-        f"  • Ваш уровень: {level} ({percentage})\n\n"
+        "<b>💰 Ваша статистика:</b>\n\n"
+        f"     •  Приглашено: <b>{referrals_count}</b> чел.\n\n"
+        f"     •  Заработано: <b>{referrals_earned:,.2f} ₽</b>\n\n"
+        f"     •  Активных: <b>{active_referrals}</b> чел.\n\n"
+        f"     •  Ваш уровень: <b>{level}</b> ({percentage})\n\n"
         "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        "🎁 Условия программы:\n"
-        "  • 10% от комиссии с каждой сделки реферала\n"
-        "  • Бонус 50 ₽ за первого реферала\n"
-        "  • Дополнительные 5% для премиум-пользователей\n"
-        "  • Выплаты каждую неделю\n\n"
-        "📊 Уровни:\n"
-        "  🥉 Бронза (0-10): 10%\n"
-        "  🥈 Серебро (11-50): 12%\n"
-        "  🥇 Золото (51-100): 15%\n"
-        "  💎 Платина (100+): 20%\n\n"
+        "<b>🎁 Условия программы:</b>\n\n"
+        "     •  10% от комиссии с каждой сделки\n\n"
+        "     •  Бонус 50 ₽ за первого реферала\n\n"
+        "     •  Дополнительные 5% для премиум\n\n"
+        "     •  Выплаты каждую неделю\n\n"
+        "<b>📊 Уровни:</b>\n\n"
+        "     🥉  Бронза (0-10): <b>10%</b>\n"
+        "     🥈  Серебро (11-50): <b>12%</b>\n"
+        "     🥇  Золото (51-100): <b>15%</b>\n"
+        "     💎  Платина (100+): <b>20%</b>\n\n"
         "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        f"🔗 Ваша реферальная ссылка:\n{ref_link}\n\n"
-        "Поделитесь ссылкой с друзьями и зарабатывайте!"
+        f"<b>🔗 Ваша реферальная ссылка:</b>\n\n"
+        f"<code>{ref_link}</code>\n\n"
+        "Поделитесь ссылкой с друзьями!"
     )
     
     keyboard = [
@@ -2351,34 +2371,35 @@ async def show_referrals(query, context: ContextTypes.DEFAULT_TYPE):
 async def show_more_info(query, context: ContextTypes.DEFAULT_TYPE):
     """Показывает подробную информацию о сервисе"""
     text = (
-        "ℹ️ О сервисе Lolz Market\n\n"
+        "<b>ℹ️ О сервисе Lolz Market</b>\n\n"
         "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        "🛡 О нас:\n"
-        "  Lolz Market - это безопасная платформа для проведения сделок "
-        "с цифровыми товарами. Мы гарантируем защиту от мошенников и "
+        "<b>🛡 О нас:</b>\n\n"
+        "Lolz Market - это безопасная платформа\n"
+        "для проведения сделок с цифровыми товарами.\n\n"
+        "Мы гарантируем защиту от мошенников и\n"
         "обеспечиваем прозрачность всех операций.\n\n"
         "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        "💼 Что мы предлагаем:\n"
-        "  • NFT юзернеймы и подарки\n"
-        "  • Telegram аккаунты и каналы\n"
-        "  • Анонимные номера\n"
-        "  • Telegram Premium подписки\n"
-        "  • Telegram Stars\n\n"
-        "🔒 Безопасность:\n"
-        "  • Система гарантов\n"
-        "  • Проверка всех участников\n"
-        "  • Шифрование данных\n"
-        "  • Страхование сделок\n"
-        "  • 24/7 мониторинг\n\n"
-        "💰 Комиссии:\n"
-        "  • Стандарт: 1% от суммы сделки\n"
-        "  • Премиум: 0.5% от суммы сделки\n"
-        "  • Минимальная комиссия: 10 ₽\n\n"
+        "<b>💼 Что мы предлагаем:</b>\n\n"
+        "     •  NFT юзернеймы и подарки\n"
+        "     •  Telegram аккаунты и каналы\n"
+        "     •  Анонимные номера\n"
+        "     •  Telegram Premium подписки\n"
+        "     •  Telegram Stars\n\n"
+        "<b>🔒 Безопасность:</b>\n\n"
+        "     •  Система гарантов\n"
+        "     •  Проверка всех участников\n"
+        "     •  Шифрование данных\n"
+        "     •  Страхование сделок\n"
+        "     •  24/7 мониторинг\n\n"
+        "<b>💰 Комиссии:</b>\n\n"
+        "     •  Стандарт: <b>1%</b> от суммы сделки\n"
+        "     •  Премиум: <b>0.5%</b> от суммы сделки\n"
+        "     •  Минимальная комиссия: <b>10 ₽</b>\n\n"
         "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        "📞 Контакты:\n"
-        "  • Поддержка: @LoIzTeamSupport\n"
-        "  • Email: support@lolz.market\n\n"
-        "⏰ Работаем круглосуточно 24/7"
+        "<b>📞 Контакты:</b>\n\n"
+        "     •  Поддержка: @LoIzTeamSupport\n"
+        "     •  Email: support@lolz.market\n\n"
+        "⏰  <b>Работаем круглосуточно 24/7</b>"
     )
     
     keyboard = [
@@ -2393,28 +2414,29 @@ async def show_more_info(query, context: ContextTypes.DEFAULT_TYPE):
 async def show_support(query, context: ContextTypes.DEFAULT_TYPE):
     """Показывает меню поддержки"""
     text = (
-        "📞 Поддержка 24/7\n\n"
+        "<b>📞 Поддержка 24/7</b>\n\n"
         "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        "👋 Здравствуйте! Мы готовы помочь вам круглосуточно.\n\n"
+        "👋  Здравствуйте!\n"
+        "     Мы готовы помочь вам круглосуточно.\n\n"
         "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        "📋 Темы обращений:\n\n"
-        "💬 Общие вопросы:\n"
-        "  • Как создать сделку?\n"
-        "  • Как работает гарант?\n"
-        "  • Вопросы по комиссиям\n\n"
-        "🔧 Технические проблемы:\n"
-        "  • Ошибки в работе бота\n"
-        "  • Проблемы с оплатой\n"
-        "  • Не приходят уведомления\n\n"
-        "⚠️ Срочные вопросы:\n"
-        "  • Проблемы со сделкой\n"
-        "  • Подозрение на мошенничество\n"
-        "  • Блокировка аккаунта\n\n"
+        "<b>📋 Темы обращений:</b>\n\n"
+        "<b>💬 Общие вопросы:</b>\n"
+        "     •  Как создать сделку?\n"
+        "     •  Как работает гарант?\n"
+        "     •  Вопросы по комиссиям\n\n"
+        "<b>🔧 Технические проблемы:</b>\n"
+        "     •  Ошибки в работе бота\n"
+        "     •  Проблемы с оплатой\n"
+        "     •  Не приходят уведомления\n\n"
+        "<b>⚠️ Срочные вопросы:</b>\n"
+        "     •  Проблемы со сделкой\n"
+        "     •  Подозрение на мошенничество\n"
+        "     •  Блокировка аккаунта\n\n"
         "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        "📧 Контакты:\n"
-        "  • Telegram: @LoIzTeamSupport\n"
-        "  • Email: support@lolz.market\n\n"
-        "⏱ Среднее время ответа: 5-15 минут"
+        "<b>📧 Контакты:</b>\n"
+        "     •  Telegram: @LoIzTeamSupport\n"
+        "     •  Email: support@lolz.market\n\n"
+        "⏱  <b>Среднее время ответа: 5-15 минут</b>"
     )
     
     keyboard = [

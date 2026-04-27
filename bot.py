@@ -2837,8 +2837,6 @@ def main():
     
     # Запускаем бота
     print("✅ Бот запущен и готов к работе!")
-    print("📊 Админ-панель доступна по адресу: http://localhost:5000")
-    print("🚀 Для запуска админ-панели выполните: python admin_panel.py")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == '__main__':

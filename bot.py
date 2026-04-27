@@ -387,7 +387,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             f"🚫 Ваш аккаунт заблокирован.\n\n"
             f"Причина: {user_data_db.get('block_reason', 'Нарушение правил')}\n\n"
-            f"Для разблокировки обратитесь в поддержку: @support"
+            f"Для разблокировки обратитесь в поддержку: @LoIzTeamSupport"
         )
         return
     
@@ -589,7 +589,7 @@ async def show_deal_info_for_buyer(update: Update, context: ContextTypes.DEFAULT
         f"⚠️ Пожалуйста, убедитесь в правильности данных перед "
         f"оплатой. Комментарий (мемо) обязателен!\n\n"
         f"В случае если вы отправили транзакцию без комментария "
-        f"заполните форму — @ManagerMarketLolz"
+        f"заполните форму — @LoIzTeamSupport"
     )
     
     keyboard = [
@@ -2207,7 +2207,7 @@ async def show_more_info(query, context: ContextTypes.DEFAULT_TYPE):
         "• Премиум: 0.5% от суммы сделки\n"
         "• Минимальная комиссия: 10 ₽\n\n"
         "📞 Контакты:\n"
-        "• Поддержка: @ManagerMarketLolz\n"
+        "• Поддержка: @LoIzTeamSupport\n"
         "• Новости: @NewsLolzMarket\n"
         "• Сайт: lolz.market\n\n"
         "⏰ Время работы:\n"
@@ -2269,7 +2269,7 @@ async def show_support(query, context: ContextTypes.DEFAULT_TYPE):
         "• Подозрение на мошенничество\n"
         "• Блокировка аккаунта\n\n"
         "📧 Контакты:\n"
-        "• Telegram: @ManagerMarketLolz\n"
+        "• Telegram: @LoIzTeamSupport\n"
         "• Email: support@lolz.market\n\n"
         "⏱ Среднее время ответа: 5-15 минут"
     )
@@ -2863,7 +2863,7 @@ async def show_faq(query, context: ContextTypes.DEFAULT_TYPE):
         "5️⃣ Сколько времени занимает сделка?\n"
         "Обычно 10-30 минут. Зависит от скорости ответа участников.\n\n"
         "6️⃣ Что делать если возникла проблема?\n"
-        "Обратитесь в поддержку @ManagerMarketLolz или создайте "
+        "Обратитесь в поддержку @LoIzTeamSupport или создайте "
         "обращение в разделе 'Обращения'.\n\n"
         "7️⃣ Как вывести деньги?\n"
         "Перейдите в 'Реквизиты' → 'Вывод средств', выберите валюту "

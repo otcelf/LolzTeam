@@ -376,11 +376,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Загружаем данные пользователя из БД
     user_data_db = get_user_data(user.id)
     if user_data_db:
-        # Синхронизируем с context.user_data
         for key, value in user_data_db.items():
             context.user_data[key] = value
-        
-        # Загружаем реквизиты
         context.user_data['requisites'] = get_requisites(user.id)
     
     # Проверяем блокировку
@@ -392,24 +389,61 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     
-    # Проверяем, есть ли параметр deep link (например: /start deal_2oa7ou4wxn)
+    # Deep link обработка
     if context.args and len(context.args) > 0:
         deal_id = context.args[0]
-        
         if deal_id.startswith('deal_'):
-            # Показываем информацию о сделке для покупателя
             await show_deal_info_for_buyer(update, context, deal_id)
             return
         elif deal_id.startswith('ref_'):
-            # Обработка реферальной ссылки
             referrer_id = deal_id.replace('ref_', '')
             context.user_data['referrer'] = referrer_id
-            await update.message.reply_text(
-                f"🎉 Вы перешли по реферальной ссылке!\n\n"
-                f"Вы получите бонусы при регистрации."
-            )
-    
-    # Обычное приветственное сообщение
+
+    # Если язык уже выбран — сразу главное меню
+    if context.user_data.get('language') and context.user_data['language'] != 'ru' or \
+       context.user_data.get('selected_language'):
+        # Язык уже выбирался — показываем меню сразу
+        welcome_text = (
+            "Добро пожаловать в Lolz Market\n\n"
+            "Безопасные сделки с гарантией\n\n"
+            "🛡 Защита от мошенников\n"
+            "📧 Автоматическое удержание средств\n"
+            "🎯 Прозрачная статистика\n"
+            "👨‍💼 Поддержка 24/7\n\n"
+            "Наш канал - @NewsLolzMarket"
+        )
+        keyboard = [
+            [InlineKeyboardButton("📝 Создать сделку", callback_data='create_deal')],
+            [
+                InlineKeyboardButton("📋 Мои сделки", callback_data='my_deals'),
+                InlineKeyboardButton("🔐 Верификация", callback_data='verification')
+            ],
+            [
+                InlineKeyboardButton("💼 Реквизиты", callback_data='requisites'),
+                InlineKeyboardButton("🌐 Язык", callback_data='change_language')
+            ],
+            [
+                InlineKeyboardButton("🔗 Рефералы", callback_data='referrals'),
+                InlineKeyboardButton("ℹ️ Подробнее", callback_data='more_info')
+            ],
+            [
+                InlineKeyboardButton("📰 Lolz News", callback_data='lolz_news'),
+                InlineKeyboardButton("📨 Обращения", callback_data='appeals')
+            ],
+            [InlineKeyboardButton("📞 Поддержка", callback_data='support')],
+            [InlineKeyboardButton("📱 Мини-приложения", callback_data='mini_apps')]
+        ]
+        if user.id == ADMIN_ID:
+            keyboard.append([InlineKeyboardButton("🔧 Админ-панель", callback_data='admin_panel')])
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        if os.path.exists(BANNER_PATH):
+            with open(BANNER_PATH, 'rb') as photo:
+                await update.message.reply_photo(photo=photo, caption=welcome_text, reply_markup=reply_markup)
+        else:
+            await update.message.reply_text(welcome_text, reply_markup=reply_markup)
+        return
+
+    # Первый запуск — приветствие и выбор языка
     welcome_text = (
         "⭐ Добро пожаловать в Lolz Team\n\n"
         "🔐 Бот для безопасных сделок.\n\n"
@@ -417,11 +451,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "сопровождение сделок в одном месте."
     )
     
-    # Создаем кнопку "Продолжить"
     keyboard = [
         [InlineKeyboardButton("➡️ Продолжить", callback_data='continue')]
     ]
-    # Кнопка админа на стартовом экране
     if user.id == ADMIN_ID:
         keyboard.append([InlineKeyboardButton("🔧 Админ-панель", callback_data='admin_panel')])
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -965,10 +997,13 @@ async def show_language_menu(query, context: ContextTypes.DEFAULT_TYPE, show_not
 
 async def handle_language_selection(query, context: ContextTypes.DEFAULT_TYPE, language):
     """Обработка выбора конкретного языка"""
-    # Сохраняем выбранный язык в контексте пользователя
     context.user_data['selected_language'] = language
-    
-    # Показываем меню снова с уведомлением о смене языка
+    context.user_data['language'] = language
+    # Сохраняем язык в БД чтобы запомнить после перезапуска
+    db = get_db()
+    db.execute('UPDATE users SET language=? WHERE user_id=?', (language, query.from_user.id))
+    db.commit()
+    db.close()
     await show_language_menu(query, context, show_notification=True)
 
 async def show_main_menu(query, context: ContextTypes.DEFAULT_TYPE):
@@ -1221,29 +1256,73 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     save_or_update_user(user_id)
     
     if deal_state == 'waiting_requisite':
-        # Сохраняем реквизиты
         requisite_type = context.user_data.get('requisite_type')
         if 'requisites' not in context.user_data:
             context.user_data['requisites'] = {}
-        
-        context.user_data['requisites'][requisite_type] = text
+
+        # ── Валидация ────────────────────────────────────────────────────
+        error_msg = None
+        if requisite_type == 'rub':
+            digits = ''.join(filter(str.isdigit, text))
+            if len(digits) not in (16, 18):
+                error_msg = (
+                    "❌ Неверный номер карты.\n\n"
+                    "Номер должен содержать 16 цифр.\n"
+                    "Пример: 4276 3800 1234 5678\n\n"
+                    "Попробуйте ещё раз:"
+                )
+        elif requisite_type == 'usd':
+            digits = ''.join(filter(str.isdigit, text))
+            if len(digits) not in (16, 18):
+                error_msg = (
+                    "❌ Неверный номер карты.\n\n"
+                    "Номер должен содержать 16 цифр.\n"
+                    "Пример: 4276 3800 1234 5678\n\n"
+                    "Попробуйте ещё раз:"
+                )
+        elif requisite_type == 'ton':
+            clean = text.strip()
+            if not ((clean.startswith('UQ') or clean.startswith('EQ')) and len(clean) == 48):
+                error_msg = (
+                    "❌ Неверный TON адрес.\n\n"
+                    "Адрес должен начинаться с UQ или EQ и содержать 48 символов.\n"
+                    "Пример: UQDxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n\n"
+                    "Попробуйте ещё раз:"
+                )
+        elif requisite_type == 'any':
+            if len(text.strip()) < 5:
+                error_msg = (
+                    "❌ Реквизиты слишком короткие.\n\n"
+                    "Введите корректные реквизиты (минимум 5 символов).\n\n"
+                    "Попробуйте ещё раз:"
+                )
+
+        if error_msg:
+            await update.message.reply_text(error_msg)
+            return
+        # ─────────────────────────────────────────────────────────────────
+
+        context.user_data['requisites'][requisite_type] = text.strip()
         context.user_data['deal_state'] = None
-        
-        # Сохраняем в БД
-        save_requisite(user_id, requisite_type, text)
+
+        save_requisite(user_id, requisite_type, text.strip())
         log_action(user_id, 'requisite_saved', f'currency={requisite_type}')
-        
+
         currency_names = {
-            'rub': 'RUB',
-            'usd': 'USD',
-            'ton': 'TON',
+            'rub': 'RUB карты',
+            'usd': 'USD карты',
+            'ton': 'TON кошелька',
             'any': 'любой валюты'
         }
-        
+
         await update.message.reply_text(
-            f"✅ Реквизиты для {currency_names.get(requisite_type, 'карты')} сохранены."
+            f"✅ Реквизиты для {currency_names.get(requisite_type, 'карты')} сохранены.\n\n"
+            f"📋 Сохранено: {text.strip()}\n\n"
+            f"⚠️ Убедитесь в правильности реквизитов!\n"
+            f"Бот автоматически переводит деньги на эти реквизиты. "
+            f"В случае ошибки средства не возвращаются."
         )
-        
+
         # Возвращаем в главное меню
         keyboard = [
             [InlineKeyboardButton("📝 Создать сделку", callback_data='create_deal')],
@@ -1267,11 +1346,11 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
             [InlineKeyboardButton("📱 Мини-приложения", callback_data='mini_apps')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        await update.message.reply_text(
-            "Главное меню:",
-            reply_markup=reply_markup
-        )
+        if os.path.exists(BANNER_PATH):
+            with open(BANNER_PATH, 'rb') as photo:
+                await update.message.reply_photo(photo=photo, caption="Главное меню:", reply_markup=reply_markup)
+        else:
+            await update.message.reply_text("Главное меню:", reply_markup=reply_markup)
     
     elif deal_state == 'waiting_amount':
         # Сохраняем сумму сделки

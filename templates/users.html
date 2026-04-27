@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Пользователи{% endblock %}
+{% block page_title %}Управление пользователями{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3><i class="fas fa-users"></i> Пользователи <span style="font-size:14px;color:var(--text-light)">({{ total }})</span></h3>
+        <div class="card-actions">
+            <a href="{{ url_for('export_users') }}" class="btn btn-secondary btn-sm">
+                <i class="fas fa-download"></i> CSV
+            </a>
+            <form method="GET" class="search-form">
+                <input type="hidden" name="status" value="{{ status }}">
+                <input type="text" name="search" placeholder="ID, username, имя..." value="{{ search }}" class="search-input">
+                <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i></button>
+            </form>
+        </div>
+    </div>
+
+    <div class="card-filters">
+        <a href="{{ url_for('users', status='all', search=search) }}" class="filter-btn {% if status=='all' %}active{% endif %}">Все</a>
+        <a href="{{ url_for('users', status='premium', search=search) }}" class="filter-btn {% if status=='premium' %}active{% endif %}">Premium</a>
+        <a href="{{ url_for('users', status='verified', search=search) }}" class="filter-btn {% if status=='verified' %}active{% endif %}">Верифицированные</a>
+        <a href="{{ url_for('users', status='active', search=search) }}" class="filter-btn {% if status=='active' %}active{% endif %}">Активные (7д)</a>
+        <a href="{{ url_for('users', status='blocked', search=search) }}" class="filter-btn {% if status=='blocked' %}active{% endif %}">Заблокированные</a>
+    </div>
+
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th><a href="{{ url_for('users', sort='user_id', order='ASC' if sort=='user_id' and order=='DESC' else 'DESC', status=status, search=search) }}" class="sort-link">ID {% if sort=='user_id' %}<i class="fas fa-sort-{{ 'down' if order=='DESC' else 'up' }}"></i>{% endif %}</a></th>
+                        <th>Пользователь</th>
+                        <th><a href="{{ url_for('users', sort='total_deals', order='ASC' if sort=='total_deals' and order=='DESC' else 'DESC', status=status, search=search) }}" class="sort-link">Сделки {% if sort=='total_deals' %}<i class="fas fa-sort-{{ 'down' if order=='DESC' else 'up' }}"></i>{% endif %}</a></th>
+                        <th><a href="{{ url_for('users', sort='rating', order='ASC' if sort=='rating' and order=='DESC' else 'DESC', status=status, search=search) }}" class="sort-link">Рейтинг {% if sort=='rating' %}<i class="fas fa-sort-{{ 'down' if order=='DESC' else 'up' }}"></i>{% endif %}</a></th>
+                        <th><a href="{{ url_for('users', sort='total_volume', order='ASC' if sort=='total_volume' and order=='DESC' else 'DESC', status=status, search=search) }}" class="sort-link">Оборот {% if sort=='total_volume' %}<i class="fas fa-sort-{{ 'down' if order=='DESC' else 'up' }}"></i>{% endif %}</a></th>
+                        <th>Статус</th>
+                        <th><a href="{{ url_for('users', sort='registration_date', order='ASC' if sort=='registration_date' and order=='DESC' else 'DESC', status=status, search=search) }}" class="sort-link">Регистрация {% if sort=='registration_date' %}<i class="fas fa-sort-{{ 'down' if order=='DESC' else 'up' }}"></i>{% endif %}</a></th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr {% if user.is_blocked %}class="blocked-row"{% endif %}>
+                        <td><a href="{{ url_for('user_detail', user_id=user.user_id) }}" class="link">{{ user.user_id }}</a></td>
+                        <td>
+                            <div class="user-cell">
+                                <strong>@{{ user.username or 'Без username' }}</strong>
+                                <small>{{ user.first_name }} {{ user.last_name or '' }}</small>
+                            </div>
+                        </td>
+                        <td>
+                            <span style="color:var(--success);font-weight:600">{{ user.successful_deals }}</span>
+                            <span style="color:var(--text-light)">/{{ user.total_deals }}</span>
+                        </td>
+                        <td><i class="fas fa-star" style="color:#fbbf24"></i> {{ "%.1f"|format(user.rating) }}</td>
+                        <td><strong>{{ "{:,.0f}".format(user.total_volume) }}₽</strong></td>
+                        <td>
+                            <div class="badges">
+                                {% if user.premium_status %}<span class="badge badge-premium">Premium</span>{% endif %}
+                                {% if user.verified %}<span class="badge badge-verified">✓</span>{% endif %}
+                                {% if user.is_blocked %}<span class="badge badge-danger">Бан</span>{% endif %}
+                            </div>
+                        </td>
+                        <td>{{ user.registration_date[:10] }}</td>
+                        <td>
+                            <div class="action-buttons">
+                                <a href="{{ url_for('user_detail', user_id=user.user_id) }}" class="btn btn-sm btn-info" title="Профиль"><i class="fas fa-eye"></i></a>
+                                {% if user.is_blocked %}
+                                <button onclick="unblockUser({{ user.user_id }})" class="btn btn-sm btn-success" title="Разблокировать"><i class="fas fa-unlock"></i></button>
+                                {% else %}
+                                <button onclick="blockUser({{ user.user_id }})" class="btn btn-sm btn-danger" title="Заблокировать"><i class="fas fa-ban"></i></button>
+                                {% endif %}
+                                {% if user.premium_status %}
+                                <button onclick="togglePremium({{ user.user_id }}, 'revoke')" class="btn btn-sm btn-warning" title="Снять Premium"><i class="fas fa-crown"></i></button>
+                                {% else %}
+                                <button onclick="togglePremium({{ user.user_id }}, 'grant')" class="btn btn-sm btn-secondary" title="Выдать Premium"><i class="fas fa-crown"></i></button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="8" style="text-align:center;color:var(--text-light);padding:40px">Пользователи не найдены</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Пагинация -->
+        {% if total_pages > 1 %}
+        <div class="pagination">
+            {% if page > 1 %}
+            <a href="{{ url_for('users', page=page-1, status=status, search=search, sort=sort, order=order) }}" class="page-btn"><i class="fas fa-chevron-left"></i></a>
+            {% endif %}
+            {% for p in range([1, page-2]|max, [total_pages+1, page+3]|min) %}
+            <a href="{{ url_for('users', page=p, status=status, search=search, sort=sort, order=order) }}" class="page-btn {% if p == page %}active{% endif %}">{{ p }}</a>
+            {% endfor %}
+            {% if page < total_pages %}
+            <a href="{{ url_for('users', page=page+1, status=status, search=search, sort=sort, order=order) }}" class="page-btn"><i class="fas fa-chevron-right"></i></a>
+            {% endif %}
+            <span class="page-info">Страница {{ page }} из {{ total_pages }} · {{ total }} пользователей</span>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function blockUser(userId) {
+    const reason = prompt('Причина блокировки:');
+    if (!reason) return;
+    fetch(`/api/user/${userId}/block`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({reason})
+    }).then(r => r.json()).then(d => { if (d.success) location.reload(); else alert(d.message); });
+}
+function unblockUser(userId) {
+    if (!confirm('Разблокировать пользователя?')) return;
+    fetch(`/api/user/${userId}/unblock`, {
+        method: 'POST', headers: {'Content-Type':'application/json'}
+    }).then(r => r.json()).then(d => { if (d.success) location.reload(); else alert(d.message); });
+}
+function togglePremium(userId, action) {
+    const msg = action === 'grant' ? 'Выдать Premium?' : 'Снять Premium?';
+    if (!confirm(msg)) return;
+    fetch(`/api/user/${userId}/premium`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({action})
+    }).then(r => r.json()).then(d => { if (d.success) location.reload(); else alert(d.message); });
+}
+</script>
+{% endblock %}

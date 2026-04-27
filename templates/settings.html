@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+
+{% block title %}Настройки{% endblock %}
+{% block page_title %}Настройки бота{% endblock %}
+
+{% block content %}
+<form method="POST" class="settings-form">
+    <!-- General Settings -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-cog"></i> Общие настройки</h3>
+        </div>
+        <div class="card-body">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="bot_name">Название бота</label>
+                    <input type="text" id="bot_name" name="bot_name" value="{{ settings.bot_name or 'Lolz Market Bot' }}" class="form-control">
+                </div>
+
+                <div class="form-group">
+                    <label for="bot_username">Username бота</label>
+                    <input type="text" id="bot_username" name="bot_username" value="{{ settings.bot_username or '@your_bot' }}" class="form-control">
+                </div>
+
+                <div class="form-group">
+                    <label for="support_username">Username поддержки</label>
+                    <input type="text" id="support_username" name="support_username" value="{{ settings.support_username or '@support' }}" class="form-control">
+                </div>
+
+                <div class="form-group">
+                    <label for="admin_chat_id">ID чата администратора</label>
+                    <input type="text" id="admin_chat_id" name="admin_chat_id" value="{{ settings.admin_chat_id or '' }}" class="form-control">
+                    <small>Для получения уведомлений</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Commission Settings -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-percent"></i> Комиссии</h3>
+        </div>
+        <div class="card-body">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="commission_default">Стандартная комиссия (%)</label>
+                    <input type="number" step="0.1" id="commission_default" name="commission_default" value="{{ settings.commission_default or '1.0' }}" class="form-control">
+                </div>
+
+                <div class="form-group">
+                    <label for="commission_premium">Комиссия для Premium (%)</label>
+                    <input type="number" step="0.1" id="commission_premium" name="commission_premium" value="{{ settings.commission_premium or '0.5' }}" class="form-control">
+                </div>
+
+                <div class="form-group">
+                    <label for="min_deal_amount">Минимальная сумма сделки (₽)</label>
+                    <input type="number" id="min_deal_amount" name="min_deal_amount" value="{{ settings.min_deal_amount or '100' }}" class="form-control">
+                </div>
+
+                <div class="form-group">
+                    <label for="max_deal_amount">Максимальная сумма сделки (₽)</label>
+                    <input type="number" id="max_deal_amount" name="max_deal_amount" value="{{ settings.max_deal_amount or '1000000' }}" class="form-control">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Referral Settings -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-users"></i> Реферальная программа</h3>
+        </div>
+        <div class="card-body">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="referral_bonus">Бонус за реферала (₽)</label>
+                    <input type="number" id="referral_bonus" name="referral_bonus" value="{{ settings.referral_bonus or '100' }}" class="form-control">
+                </div>
+
+                <div class="form-group">
+                    <label for="referral_commission">Комиссия с рефералов (%)</label>
+                    <input type="number" step="0.1" id="referral_commission" name="referral_commission" value="{{ settings.referral_commission or '5.0' }}" class="form-control">
+                </div>
+
+                <div class="form-group">
+                    <label for="referral_levels">Уровней реферальной системы</label>
+                    <input type="number" id="referral_levels" name="referral_levels" value="{{ settings.referral_levels or '2' }}" class="form-control">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Verification Settings -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-certificate"></i> Верификация</h3>
+        </div>
+        <div class="card-body">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="verification_min_deals">Минимум сделок для верификации</label>
+                    <input type="number" id="verification_min_deals" name="verification_min_deals" value="{{ settings.verification_min_deals or '10' }}" class="form-control">
+                </div>
+
+                <div class="form-group">
+                    <label for="verification_min_rating">Минимальный рейтинг для верификации</label>
+                    <input type="number" step="0.1" id="verification_min_rating" name="verification_min_rating" value="{{ settings.verification_min_rating or '4.5' }}" class="form-control">
+                </div>
+
+                <div class="form-group">
+                    <label for="premium_price">Стоимость Premium (₽/месяц)</label>
+                    <input type="number" id="premium_price" name="premium_price" value="{{ settings.premium_price or '299' }}" class="form-control">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Settings -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-credit-card"></i> Платежные реквизиты</h3>
+        </div>
+        <div class="card-body">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="guarantor_sber">Сбербанк гаранта</label>
+                    <input type="text" id="guarantor_sber" name="guarantor_sber" value="{{ settings.guarantor_sber or '79278171305 Мария' }}" class="form-control">
+                </div>
+
+                <div class="form-group">
+                    <label for="guarantor_ton">TON кошелек гаранта</label>
+                    <input type="text" id="guarantor_ton" name="guarantor_ton" value="{{ settings.guarantor_ton or '' }}" class="form-control">
+                </div>
+
+                <div class="form-group">
+                    <label for="payment_timeout">Таймаут оплаты (минут)</label>
+                    <input type="number" id="payment_timeout" name="payment_timeout" value="{{ settings.payment_timeout or '30' }}" class="form-control">
+                </div>
+
+                <div class="form-group">
+                    <label for="transfer_timeout">Таймаут передачи товара (минут)</label>
+                    <input type="number" id="transfer_timeout" name="transfer_timeout" value="{{ settings.transfer_timeout or '60' }}" class="form-control">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Settings -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-bell"></i> Уведомления</h3>
+        </div>
+        <div class="card-body">
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="notify_new_user" {% if settings.notify_new_user != 'false' %}checked{% endif %}>
+                    <span>Уведомлять о новых пользователях</span>
+                </label>
+            </div>
+
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="notify_new_deal" {% if settings.notify_new_deal != 'false' %}checked{% endif %}>
+                    <span>Уведомлять о новых сделках</span>
+                </label>
+            </div>
+
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="notify_appeal" {% if settings.notify_appeal != 'false' %}checked{% endif %}>
+                    <span>Уведомлять о новых обращениях</span>
+                </label>
+            </div>
+
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="notify_verification" {% if settings.notify_verification != 'false' %}checked{% endif %}>
+                    <span>Уведомлять о заявках на верификацию</span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Maintenance Mode -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-tools"></i> Режим обслуживания</h3>
+        </div>
+        <div class="card-body">
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="maintenance_mode" {% if settings.maintenance_mode == 'true' %}checked{% endif %}>
+                    <span>Включить режим обслуживания</span>
+                </label>
+                <small>Бот будет недоступен для пользователей</small>
+            </div>
+
+            <div class="form-group">
+                <label for="maintenance_message">Сообщение в режиме обслуживания</label>
+                <textarea id="maintenance_message" name="maintenance_message" rows="3" class="form-control">{{ settings.maintenance_message or 'Бот временно недоступен. Ведутся технические работы.' }}</textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- Save Button -->
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary btn-lg">
+            <i class="fas fa-save"></i> Сохранить настройки
+        </button>
+    </div>
+</form>
+{% endblock %}

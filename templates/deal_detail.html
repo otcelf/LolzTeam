@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+
+{% block title %}Сделка {{ deal.deal_id }}{% endblock %}
+{% block page_title %}Детали сделки{% endblock %}
+
+{% block content %}
+<div class="back-link">
+    <a href="{{ url_for('deals') }}">
+        <i class="fas fa-arrow-left"></i> Назад к списку
+    </a>
+</div>
+
+<!-- Deal Info Card -->
+<div class="card deal-detail-card">
+    <div class="card-header">
+        <h3><i class="fas fa-handshake"></i> Информация о сделке</h3>
+        <div style="display:flex;gap:10px;align-items:center">
+            <span class="badge badge-{{ deal.status }} badge-lg">{{ deal.status }}</span>
+            {% if deal.status not in ['completed','cancelled'] %}
+            <button onclick="openStatusModal()" class="btn btn-sm btn-warning"><i class="fas fa-edit"></i> Изменить статус</button>
+            {% endif %}
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="deal-info-grid">
+            <div class="info-item">
+                <label>ID сделки:</label>
+                <div class="deal-id-full">
+                    <code>{{ deal.deal_id }}</code>
+                    <button onclick="copyToClipboard('{{ deal.deal_id }}')" class="btn btn-sm btn-secondary">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="info-item">
+                <label>Ссылка на сделку:</label>
+                <div class="deal-link">
+                    <code>https://t.me/your_bot?start=deal_{{ deal.deal_id }}</code>
+                    <button onclick="copyToClipboard('https://t.me/your_bot?start=deal_{{ deal.deal_id }}')" class="btn btn-sm btn-secondary">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="info-item">
+                <label>Тип товара:</label>
+                <strong>{{ deal.product_type }}</strong>
+            </div>
+
+            <div class="info-item">
+                <label>Описание:</label>
+                <p>{{ deal.product_description }}</p>
+            </div>
+
+            <div class="info-item">
+                <label>Сумма:</label>
+                <strong class="amount-large">{{ deal.amount }} {{ deal.currency }}</strong>
+            </div>
+
+            <div class="info-item">
+                <label>Дата создания:</label>
+                <span>{{ deal.created_at }}</span>
+            </div>
+
+            {% if deal.paid_at %}
+            <div class="info-item">
+                <label>Дата оплаты:</label>
+                <span>{{ deal.paid_at }}</span>
+            </div>
+            {% endif %}
+
+            {% if deal.completed_at %}
+            <div class="info-item">
+                <label>Дата завершения:</label>
+                <span>{{ deal.completed_at }}</span>
+            </div>
+            {% endif %}
+
+            {% if deal.cancelled_at %}
+            <div class="info-item">
+                <label>Дата отмены:</label>
+                <span>{{ deal.cancelled_at }}</span>
+            </div>
+            <div class="info-item">
+                <label>Причина отмены:</label>
+                <span>{{ deal.cancel_reason }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Participants -->
+<div class="grid-2">
+    <!-- Seller -->
+    <div class="card participant-card">
+        <div class="card-header">
+            <h3><i class="fas fa-user-tie"></i> Продавец</h3>
+        </div>
+        <div class="card-body">
+            <div class="participant-info">
+                <div class="participant-avatar">
+                    <i class="fas fa-user-circle"></i>
+                </div>
+                <div class="participant-details">
+                    <h4>
+                        <a href="{{ url_for('user_detail', user_id=deal.seller_id) }}" class="link">
+                            @{{ deal.seller_username }}
+                        </a>
+                    </h4>
+                    <p>ID: <a href="tg://user?id={{ deal.seller_id }}" class="link">{{ deal.seller_id }}</a></p>
+                    <div class="participant-stats">
+                        <div class="stat">
+                            <i class="fas fa-star"></i>
+                            <span>{{ "%.1f"|format(deal.seller_rating) }}</span>
+                        </div>
+                    </div>
+                    <a href="{{ url_for('user_detail', user_id=deal.seller_id) }}" class="btn btn-sm btn-primary">
+                        <i class="fas fa-eye"></i> Профиль
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Buyer -->
+    <div class="card participant-card">
+        <div class="card-header">
+            <h3><i class="fas fa-user"></i> Покупатель</h3>
+        </div>
+        <div class="card-body">
+            {% if deal.buyer_username %}
+            <div class="participant-info">
+                <div class="participant-avatar">
+                    <i class="fas fa-user-circle"></i>
+                </div>
+                <div class="participant-details">
+                    <h4>
+                        <a href="{{ url_for('user_detail', user_id=deal.buyer_id) }}" class="link">
+                            @{{ deal.buyer_username }}
+                        </a>
+                    </h4>
+                    <p>ID: <a href="tg://user?id={{ deal.buyer_id }}" class="link">{{ deal.buyer_id }}</a></p>
+                    <div class="participant-stats">
+                        <div class="stat">
+                            <i class="fas fa-star"></i>
+                            <span>{{ "%.1f"|format(deal.buyer_rating) }}</span>
+                        </div>
+                    </div>
+                    <a href="{{ url_for('user_detail', user_id=deal.buyer_id) }}" class="btn btn-sm btn-primary">
+                        <i class="fas fa-eye"></i> Профиль
+                    </a>
+                </div>
+            </div>
+            {% else %}
+            <div class="no-buyer">
+                <i class="fas fa-hourglass-half"></i>
+                <p>Ожидание покупателя</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Timeline -->
+<div class="card">
+    <div class="card-header">
+        <h3><i class="fas fa-history"></i> История сделки</h3>
+    </div>
+    <div class="card-body">
+        <div class="timeline">
+            <div class="timeline-item completed">
+                <div class="timeline-marker">
+                    <i class="fas fa-check"></i>
+                </div>
+                <div class="timeline-content">
+                    <h4>Сделка создана</h4>
+                    <p>{{ deal.created_at }}</p>
+                </div>
+            </div>
+
+            {% if deal.paid_at %}
+            <div class="timeline-item completed">
+                <div class="timeline-marker">
+                    <i class="fas fa-check"></i>
+                </div>
+                <div class="timeline-content">
+                    <h4>Оплата получена</h4>
+                    <p>{{ deal.paid_at }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if deal.completed_at %}
+            <div class="timeline-item completed">
+                <div class="timeline-marker">
+                    <i class="fas fa-check"></i>
+                </div>
+                <div class="timeline-content">
+                    <h4>Сделка завершена</h4>
+                    <p>{{ deal.completed_at }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if deal.cancelled_at %}
+            <div class="timeline-item cancelled">
+                <div class="timeline-marker">
+                    <i class="fas fa-times"></i>
+                </div>
+                <div class="timeline-content">
+                    <h4>Сделка отменена</h4>
+                    <p>{{ deal.cancelled_at }}</p>
+                    <small>Причина: {{ deal.cancel_reason }}</small>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+<!-- Модалка: изменить статус -->
+<div id="statusModal" class="modal-overlay" style="display:none">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3><i class="fas fa-edit"></i> Изменить статус сделки</h3>
+            <button onclick="document.getElementById('statusModal').style.display='none'" class="modal-close"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>Новый статус</label>
+                <select id="newStatus" class="form-control">
+                    <option value="created">created — Создана</option>
+                    <option value="active">active — Активна</option>
+                    <option value="paid">paid — Оплачена</option>
+                    <option value="completed">completed — Завершена</option>
+                    <option value="cancelled">cancelled — Отменена</option>
+                </select>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button onclick="submitStatus()" class="btn btn-primary"><i class="fas fa-check"></i> Применить</button>
+            <button onclick="document.getElementById('statusModal').style.display='none'" class="btn btn-secondary">Отмена</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const DEAL_ID = '{{ deal.deal_id }}';
+
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        showNotification('Скопировано!', 'success');
+    });
+}
+
+function openStatusModal() {
+    document.getElementById('statusModal').style.display = 'flex';
+}
+
+function submitStatus() {
+    const status = document.getElementById('newStatus').value;
+    fetch(`/api/deal/${DEAL_ID}/status`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({status})
+    }).then(r=>r.json()).then(d=>{
+        if (d.success) { showNotification(d.message,'success'); setTimeout(()=>location.reload(),1000); }
+        else alert(d.message);
+    });
+    document.getElementById('statusModal').style.display='none';
+}
+
+document.getElementById('statusModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('statusModal')) e.target.style.display='none';
+});
+</script>
+{% endblock %}

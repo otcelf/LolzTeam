@@ -765,11 +765,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == 'admin_broadcast_all':
         if query.from_user.id == ADMIN_ID:
             context.user_data['admin_state'] = 'broadcast_all'
-            await query.edit_message_text("📢 Введите текст рассылки (всем пользователям):\n\nСообщение будет отправлено с баннером.")
+            await admin_edit(query, "📢 Введите текст рассылки (всем пользователям):\n\nСообщение будет отправлено с баннером.", [])
     elif query.data == 'admin_broadcast_premium':
         if query.from_user.id == ADMIN_ID:
             context.user_data['admin_state'] = 'broadcast_premium'
-            await query.edit_message_text("💎 Введите текст рассылки (только Premium):")
+            await admin_edit(query, "💎 Введите текст рассылки (только Premium):", [])
     elif query.data == 'admin_logs':
         if query.from_user.id == ADMIN_ID:
             await admin_logs(query, context)
@@ -797,7 +797,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if query.from_user.id == ADMIN_ID:
             uid = int(query.data.replace('admin_block_', ''))
             context.user_data['admin_state'] = f'block_{uid}'
-            await query.edit_message_text(f"🚫 Введите причину блокировки пользователя {uid}:")
+            await admin_edit(query, f"🚫 Введите причину блокировки пользователя {uid}:", [])
     elif query.data.startswith('admin_unblock_'):
         if query.from_user.id == ADMIN_ID:
             uid = int(query.data.replace('admin_unblock_', ''))
@@ -829,19 +829,20 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if query.from_user.id == ADMIN_ID:
             uid = int(query.data.replace('admin_balance_', ''))
             context.user_data['admin_state'] = f'balance_{uid}'
-            await query.edit_message_text(
+            await admin_edit(query,
                 f"💰 Изменить баланс пользователя {uid}\n\n"
                 "Введите в формате:\n"
-                "`+1000 rub` — пополнить на 1000 руб\n"
-                "`-500 rub` — списать 500 руб\n"
-                "`=5000 rub` — установить 5000 руб\n\n"
-                "Валюты: rub, usd, ton, stars"
+                "+1000 rub — пополнить на 1000 руб\n"
+                "-500 rub — списать 500 руб\n"
+                "=5000 rub — установить 5000 руб\n\n"
+                "Валюты: rub, usd, ton, stars",
+                []
             )
     elif query.data.startswith('admin_msg_'):
         if query.from_user.id == ADMIN_ID:
             uid = int(query.data.replace('admin_msg_', ''))
             context.user_data['admin_state'] = f'msg_{uid}'
-            await query.edit_message_text(f"✉️ Введите сообщение для пользователя {uid}:\n\nОтправится с баннером.")
+            await admin_edit(query, f"✉️ Введите сообщение для пользователя {uid}:\n\nОтправится с баннером.", [])
     elif query.data.startswith('admin_verify_approve_'):
         if query.from_user.id == ADMIN_ID:
             vid = int(query.data.replace('admin_verify_approve_', ''))
@@ -862,12 +863,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if query.from_user.id == ADMIN_ID:
             vid = int(query.data.replace('admin_verify_reject_', ''))
             context.user_data['admin_state'] = f'verify_reject_{vid}'
-            await query.edit_message_text("❌ Введите причину отклонения верификации:")
+            await admin_edit(query, "❌ Введите причину отклонения верификации:", [])
     elif query.data.startswith('admin_appeal_resolve_'):
         if query.from_user.id == ADMIN_ID:
             aid = int(query.data.replace('admin_appeal_resolve_', ''))
             context.user_data['admin_state'] = f'appeal_resolve_{aid}'
-            await query.edit_message_text("✍️ Введите ответ на обращение:")
+            await admin_edit(query, "✍️ Введите ответ на обращение:", [])
     elif query.data.startswith('admin_deal_cancel_'):
         if query.from_user.id == ADMIN_ID:
             did = query.data.replace('admin_deal_cancel_', '')
@@ -2497,6 +2498,18 @@ async def handle_withdraw_currency(query, context: ContextTypes.DEFAULT_TYPE, cu
 # ADMIN PANEL — только для ADMIN_ID
 # ═══════════════════════════════════════════════════════════════════
 
+async def admin_edit(query, text, keyboard):
+    """Универсальное редактирование для админки — работает и с фото и с текстом"""
+    markup = InlineKeyboardMarkup(keyboard)
+    try:
+        if query.message.photo:
+            await query.message.edit_caption(caption=text, reply_markup=markup)
+        else:
+            await query.edit_message_text(text, reply_markup=markup)
+    except Exception:
+        # Fallback — отправляем новое сообщение
+        await query.message.reply_text(text, reply_markup=markup)
+
 async def show_admin_panel(query, context):
     """Главное меню админ-панели"""
     db = get_db()
@@ -2533,7 +2546,7 @@ async def show_admin_panel(query, context):
         [InlineKeyboardButton("📋 Логи", callback_data='admin_logs')],
         [InlineKeyboardButton("⬅️ Главное меню", callback_data='back_to_main')],
     ]
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    await admin_edit(query, text, keyboard)
 
 
 async def admin_stats(query, context):
@@ -2566,7 +2579,7 @@ async def admin_stats(query, context):
         f"🏆 Топ продавцов:\n{top_text}"
     )
     keyboard = [[InlineKeyboardButton("⬅️ Назад", callback_data='admin_panel')]]
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    await admin_edit(query, text, keyboard)
 
 
 async def admin_users_list(query, context):
@@ -2597,7 +2610,7 @@ async def admin_users_list(query, context):
     if nav:
         keyboard.append(nav)
     keyboard.append([InlineKeyboardButton("⬅️ Назад", callback_data='admin_panel')])
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    await admin_edit(query, text, keyboard)
 
 
 async def admin_user_info(query, context, uid):
@@ -2644,7 +2657,7 @@ async def admin_user_info(query, context, uid):
         InlineKeyboardButton("✉️ Написать", callback_data=f'admin_msg_{uid}'),
     ])
     keyboard.append([InlineKeyboardButton("⬅️ Назад", callback_data='admin_users')])
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    await admin_edit(query, text, keyboard)
 
 
 async def admin_deals_list(query, context):
@@ -2676,7 +2689,7 @@ async def admin_deals_list(query, context):
     if nav:
         keyboard.append(nav)
     keyboard.append([InlineKeyboardButton("⬅️ Назад", callback_data='admin_panel')])
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    await admin_edit(query, text, keyboard)
 
 
 async def admin_appeals_list(query, context):
@@ -2697,7 +2710,7 @@ async def admin_appeals_list(query, context):
     if not appeals:
         text += "Нет открытых обращений ✅"
     keyboard.append([InlineKeyboardButton("⬅️ Назад", callback_data='admin_panel')])
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    await admin_edit(query, text, keyboard)
 
 
 async def admin_verifications_list(query, context):
@@ -2721,7 +2734,7 @@ async def admin_verifications_list(query, context):
     if not verifs:
         text += "Нет заявок ✅"
     keyboard.append([InlineKeyboardButton("⬅️ Назад", callback_data='admin_panel')])
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    await admin_edit(query, text, keyboard)
 
 
 async def admin_broadcast_menu(query, context):
@@ -2740,7 +2753,7 @@ async def admin_broadcast_menu(query, context):
         [InlineKeyboardButton(f"💎 Только Premium ({premium})", callback_data='admin_broadcast_premium')],
         [InlineKeyboardButton("⬅️ Назад", callback_data='admin_panel')],
     ]
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    await admin_edit(query, text, keyboard)
 
 
 async def admin_logs(query, context):
@@ -2758,7 +2771,7 @@ async def admin_logs(query, context):
         text += f"• {l['action']} {user}\n  {str(l['created_at'])[:16]}\n"
 
     keyboard = [[InlineKeyboardButton("⬅️ Назад", callback_data='admin_panel')]]
-    await query.edit_message_text(text[:4000], reply_markup=InlineKeyboardMarkup(keyboard))
+    await admin_edit(query, text[:4000], keyboard)
 
 
 async def admin_handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):

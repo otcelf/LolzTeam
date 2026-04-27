@@ -319,33 +319,34 @@ BANNER_PATH = 'banner.jpg'
 ADMIN_ID = 8659836741
 
 async def send_or_edit_with_banner(query_or_message, text, reply_markup, context=None, is_query=True):
-    """Универсальная функция для отправки/редактирования сообщений с баннером.
-    Баннер отправляется ВСЕГДА если файл существует."""
+    """Универсальная функция. Всегда отправляет/показывает баннер."""
     banner_exists = os.path.exists(BANNER_PATH)
 
     if is_query:
         message = query_or_message.message
-        if banner_exists and message.photo:
-            # Уже фото — просто меняем caption
+        if banner_exists:
+            if message.photo:
+                # Уже фото — меняем только caption
+                try:
+                    await message.edit_caption(caption=text, reply_markup=reply_markup)
+                    return
+                except Exception:
+                    pass
+            # Нет фото — удаляем старое сообщение и отправляем новое с баннером
             try:
-                await message.edit_caption(caption=text, reply_markup=reply_markup)
-                return
+                await message.delete()
             except Exception:
                 pass
-        # Пробуем edit_message_text (если нет фото или не получилось)
-        try:
-            await query_or_message.edit_message_text(text=text, reply_markup=reply_markup)
-            return
-        except Exception:
-            pass
-        # Fallback — отправляем новое сообщение с баннером
-        if banner_exists:
             with open(BANNER_PATH, 'rb') as photo:
-                await message.reply_photo(photo=photo, caption=text, reply_markup=reply_markup)
+                await message.chat.send_photo(photo=photo, caption=text, reply_markup=reply_markup)
         else:
-            await message.reply_text(text=text, reply_markup=reply_markup)
+            # Баннера нет — просто редактируем текст
+            try:
+                await query_or_message.edit_message_text(text=text, reply_markup=reply_markup)
+            except Exception:
+                await message.reply_text(text=text, reply_markup=reply_markup)
     else:
-        # Обычное сообщение — всегда с баннером
+        # Новое сообщение — всегда с баннером
         if banner_exists:
             with open(BANNER_PATH, 'rb') as photo:
                 await query_or_message.reply_photo(photo=photo, caption=text, reply_markup=reply_markup)
@@ -644,7 +645,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         deal_id = query.data.replace('cancel_deal_', '')
         update_deal_status(deal_id, 'cancelled')
         log_action(query.from_user.id, 'deal_cancelled', f'deal_id={deal_id}')
-        await query.edit_message_text(text=f"❌ Сделка {deal_id} отменена.")
+        await send_or_edit_with_banner(query, f"❌ Сделка {deal_id} отменена.", None, context, is_query=True)
         await show_main_menu(query, context)
     elif query.data.startswith('paid_'):
         # Покупатель нажал "Я оплатил"
@@ -1057,10 +1058,7 @@ async def handle_product_selection(query, context: ContextTypes.DEFAULT_TYPE, pr
     
     # Сохраняем выбранный тип товара
     context.user_data['product_type'] = product_type
-    
-    await query.edit_message_text(
-        text=f"Вы выбрали: {product_name}\n\nЗдесь будет форма создания сделки для этого типа товара."
-    )
+    await send_or_edit_with_banner(query, f"Вы выбрали: {product_name}\n\nЗдесь будет форма создания сделки для этого типа товара.", None, context, is_query=True)
 
 async def show_currency_menu(query, context: ContextTypes.DEFAULT_TYPE, product_type):
     """Показывает меню выбора валюты для сделки"""
@@ -3048,24 +3046,16 @@ async def handle_topup_confirmed(query, context: ContextTypes.DEFAULT_TYPE):
     
     await send_or_edit_with_banner(query, "⏳ Проверяем поступление платежа...\n\nПожалуйста, подождите.", None, context, is_query=True)
     
-    # Имитация проверки (5 секунд)
     await asyncio.sleep(5)
-    
-    await query.edit_message_text(
-        text=(
-            "✅ Платеж получен!\n\n"
-            "💰 Баланс успешно пополнен.\n"
-            "Средства доступны для использования.\n\n"
-            "Спасибо за использование Lolz Market!"
-        )
-    )
     
     keyboard = [
         [InlineKeyboardButton("⬅️ В главное меню", callback_data='back_to_main')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    await query.message.reply_text(
-        "Выберите действие:",
-        reply_markup=reply_markup
+    text = (
+        "✅ Платеж получен!\n\n"
+        "💰 Баланс успешно пополнен.\n"
+        "Средства доступны для использования.\n\n"
+        "Спасибо за использование Lolz Market!"
     )
+    await send_or_edit_with_banner(query, text, reply_markup, context, is_query=True)
